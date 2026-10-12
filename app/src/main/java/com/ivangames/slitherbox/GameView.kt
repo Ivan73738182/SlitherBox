@@ -37,6 +37,9 @@ class GameView(context: Context) : View(context) {
     private data class Food(val x: Float, val y: Float)
     private val foods = mutableListOf<Food>()
 
+    // ===== БОТЫ =====
+    private val bots = mutableListOf<BotSnake>()
+
     // ===== ДЖОЙСТИК =====
     private var joyCenterX = 0f
     private var joyCenterY = 0f
@@ -88,6 +91,8 @@ class GameView(context: Context) : View(context) {
         isAntiAlias = true
         isFakeBoldText = true
     }
+    private val paintBotBody = Paint().apply { isAntiAlias = true }
+    private val paintBotHead = Paint().apply { isAntiAlias = true }
 
     private var lastFrameTime = 0L
 
@@ -101,11 +106,29 @@ class GameView(context: Context) : View(context) {
 
         headAngle = 0f
 
+        // Спавним еду
         repeat(200) {
             foods.add(Food(
                 (50..(worldSize.toInt() - 50)).random().toFloat(),
                 (50..(worldSize.toInt() - 50)).random().toFloat()
             ))
+        }
+
+        // Спавним 5 ботов
+        val botColors = listOf(
+            Color.rgb(255, 100, 100) to Color.rgb(255, 150, 150),  // красный
+            Color.rgb(255, 220, 100) to Color.rgb(255, 240, 160),  // жёлтый
+            Color.rgb(180, 120, 255) to Color.rgb(210, 170, 255),  // фиолетовый
+            Color.rgb(255, 160, 80)  to Color.rgb(255, 200, 130),  // оранжевый
+            Color.rgb(100, 200, 255) to Color.rgb(160, 230, 255)   // голубой
+        )
+
+        val margin = 300f
+        for (colors in botColors) {
+            val bx = margin + Math.random().toFloat() * (worldSize - 2 * margin)
+            val by = margin + Math.random().toFloat() * (worldSize - 2 * margin)
+            val ba = (Math.random() * 2 * Math.PI).toFloat()
+            bots.add(BotSnake(bx, by, ba, colors.first, colors.second, worldSize))
         }
 
         lastFrameTime = SystemClock.uptimeMillis()
@@ -136,6 +159,7 @@ class GameView(context: Context) : View(context) {
     private fun update(dt: Long) {
         val speed = baseSpeed * (dt / 16.67f)
 
+        // ===== ИГРОК =====
         if (joyActive) {
             val targetAngle = atan2(joyVectorY, joyVectorX)
             var diff = targetAngle - headAngle
@@ -161,6 +185,30 @@ class GameView(context: Context) : View(context) {
 
         checkFoodCollision(clampedX, clampedY)
 
+        // ===== БОТЫ =====
+        val foodPositions = foods.map { PointF(it.x, it.y) }
+        for (bot in bots) {
+            bot.update(dt, foodPositions)
+        }
+
+        // Боты едят еду
+        val eatenFoods = mutableListOf<Food>()
+        for (bot in bots) {
+            for (food in foods) {
+                if (bot.tryEat(food.x, food.y)) {
+                    eatenFoods.add(food)
+                    // Спавним новую еду
+                    foods.add(Food(
+                        (50..(worldSize.toInt() - 50)).random().toFloat(),
+                        (50..(worldSize.toInt() - 50)).random().toFloat()
+                    ))
+                    break
+                }
+            }
+        }
+        foods.removeAll(eatenFoods)
+
+        // ===== КАМЕРА =====
         camX = clampedX - width / 2f
         camY = clampedY - height / 2f
     }
@@ -228,6 +276,7 @@ class GameView(context: Context) : View(context) {
     private fun drawWorld(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 30, 50))
 
+        // Сетка
         val gridSize = 100f
         val gridStartX = -(camX % gridSize)
         val gridStartY = -(camY % gridSize)
@@ -242,12 +291,14 @@ class GameView(context: Context) : View(context) {
             y += gridSize
         }
 
+        // Границы мира
         canvas.drawRect(
             -camX, -camY,
             worldSize - camX, worldSize - camY,
             paintBorder
         )
 
+        // Еда
         for (food in foods) {
             val sx = food.x - camX
             val sy = food.y - camY
@@ -256,6 +307,12 @@ class GameView(context: Context) : View(context) {
             }
         }
 
+        // Боты
+        for (bot in bots) {
+            bot.draw(canvas, camX, camY, paintBotBody, paintBotHead)
+        }
+
+        // ===== ИГРОК =====
         val segments = getSnakeSegments()
 
         for (i in segments.size - 1 downTo 1) {
@@ -301,9 +358,11 @@ class GameView(context: Context) : View(context) {
             segmentRadius * 0.18f, paintEyeBlack
         )
 
+        // Джойстик
         canvas.drawCircle(joyCenterX, joyCenterY, joyRadius, paintJoyBase)
         canvas.drawCircle(joyKnobX, joyKnobY, joyRadius * 0.45f, paintJoyKnob)
 
+        // UI
         canvas.drawText("Score: $score", 40f, 70f, paintScore)
         canvas.drawText("Length: $snakeLength", 40f, 130f, paintScore)
     }
