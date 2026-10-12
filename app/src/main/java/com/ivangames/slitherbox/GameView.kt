@@ -33,9 +33,10 @@ class GameView(context: Context) : View(context) {
     // ===== СОСТОЯНИЕ ИГРЫ =====
     private var isGameOver = false
 
-    // ===== РЕКОРД =====
+    // ===== РЕКОРД + СКИН =====
     private lateinit var prefs: SharedPreferences
     private var bestScore = 0
+    private var skinColor: Int = 0xFF80DC78.toInt()
 
     // ===== КАМЕРА =====
     private var camX = 0f
@@ -82,10 +83,7 @@ class GameView(context: Context) : View(context) {
     }
     private val paintFood = Paint().apply { isAntiAlias = true }
     private val paintSnakeBody = Paint().apply { isAntiAlias = true }
-    private val paintSnakeHead = Paint().apply {
-        color = Color.rgb(140, 255, 170)
-        isAntiAlias = true
-    }
+    private val paintSnakeHead = Paint().apply { isAntiAlias = true }
     private val paintEyeWhite = Paint().apply {
         color = Color.WHITE
         isAntiAlias = true
@@ -140,6 +138,7 @@ class GameView(context: Context) : View(context) {
     init {
         prefs = context.getSharedPreferences("slitherbox", Context.MODE_PRIVATE)
         bestScore = prefs.getInt("best_score", 0)
+        skinColor = prefs.getInt("skin_color", 0xFF80DC78.toInt())
 
         startNewGame()
 
@@ -163,12 +162,13 @@ class GameView(context: Context) : View(context) {
         score = 0
         isGameOver = false
 
-        // Еда
+        // Обновляем скин (мог поменяться в меню)
+        skinColor = prefs.getInt("skin_color", 0xFF80DC78.toInt())
+
         repeat(200) {
             foods.add(spawnFood())
         }
 
-        // Боты
         val botColors = listOf(
             Color.rgb(255, 100, 100) to Color.rgb(255, 150, 150),
             Color.rgb(255, 220, 100) to Color.rgb(255, 240, 160),
@@ -185,7 +185,6 @@ class GameView(context: Context) : View(context) {
             bots.add(BotSnake(bx, by, ba, colors.first, colors.second, worldSize))
         }
 
-        // Сброс джойстика
         joyKnobX = joyCenterX
         joyKnobY = joyCenterY
         joyVectorX = 0f
@@ -235,7 +234,6 @@ class GameView(context: Context) : View(context) {
     private fun update(dt: Long) {
         val speed = baseSpeed * (dt / 16.67f)
 
-        // ===== ИГРОК: ПОВОРОТ =====
         if (joyActive) {
             val targetAngle = atan2(joyVectorY, joyVectorX)
             var diff = targetAngle - headAngle
@@ -246,12 +244,11 @@ class GameView(context: Context) : View(context) {
             headAngle += diff.coerceIn(-turnSpeed, turnSpeed)
         }
 
-        // ===== ИГРОК: ДВИЖЕНИЕ =====
         val head = trail.last()
         val newHeadX = head.x + cos(headAngle) * speed
         val newHeadY = head.y + sin(headAngle) * speed
 
-        // ===== ПРОВЕРКА СМЕРТИ: СТЕНЫ =====
+        // Стены
         if (newHeadX < segmentRadius || newHeadX > worldSize - segmentRadius ||
             newHeadY < segmentRadius || newHeadY > worldSize - segmentRadius
         ) {
@@ -265,12 +262,10 @@ class GameView(context: Context) : View(context) {
             trail.removeAt(0)
         }
 
-        // ===== ПРОВЕРКА СМЕРТИ: СТОЛКНОВЕНИЕ С БОТАМИ =====
-        val playerSegments = getSnakeSegments()
+        // Столкновения с ботами
         for (bot in bots) {
             if (!bot.alive) continue
             val botSegments = bot.getSegments()
-            // Голова игрока против всех сегментов бота (кроме головы бота)
             for (i in 1 until botSegments.size) {
                 val seg = botSegments[i]
                 val dx = newHeadX - seg.x
@@ -280,7 +275,6 @@ class GameView(context: Context) : View(context) {
                     return
                 }
             }
-            // Голова игрока против головы бота
             if (botSegments.isNotEmpty()) {
                 val botHead = botSegments[0]
                 val dx = newHeadX - botHead.x
@@ -292,24 +286,12 @@ class GameView(context: Context) : View(context) {
             }
         }
 
-        // ===== ИГРОК ЕСТ =====
         checkFoodCollision(newHeadX, newHeadY)
 
-        // ===== ОБНОВЛЕНИЕ БОТОВ =====
-        // Собираем все сегменты, которые боты должны избегать:
-        // сегменты игрока + сегменты других ботов
-        val allSegments = mutableListOf<PointF>()
-        allSegments.addAll(getSnakeSegments())  // сегменты игрока
-        for (otherBot in bots) {
-            if (otherBot.alive) {
-                allSegments.addAll(otherBot.getSegments())
-            }
-        }
-
+        // Боты
         val foodPositions = foods.map { PointF(it.x, it.y) }
         for (bot in bots) {
             if (!bot.alive) continue
-            // Каждый бот видит сегменты ВСЕХ змей, кроме своих собственных
             val enemiesForThisBot = mutableListOf<PointF>()
             enemiesForThisBot.addAll(getSnakeSegments())
             for (otherBot in bots) {
@@ -320,7 +302,6 @@ class GameView(context: Context) : View(context) {
             bot.update(dt, foodPositions, enemiesForThisBot)
         }
 
-        // Боты едят еду
         val eatenFoods = mutableListOf<Food>()
         for (bot in bots) {
             if (!bot.alive) continue
@@ -334,10 +315,8 @@ class GameView(context: Context) : View(context) {
         }
         foods.removeAll(eatenFoods)
 
-        // Убираем мёртвых ботов (через 2 секунды после смерти — чтобы исчезли красиво)
         bots.removeAll { !it.alive }
 
-        // ===== КАМЕРА =====
         camX = newHeadX - width / 2f
         camY = newHeadY - height / 2f
     }
@@ -345,7 +324,6 @@ class GameView(context: Context) : View(context) {
     private fun gameOver() {
         isGameOver = true
 
-        // Сохраняем рекорд
         if (score > bestScore) {
             bestScore = score
             prefs.edit().putInt("best_score", bestScore).apply()
@@ -425,7 +403,7 @@ class GameView(context: Context) : View(context) {
             y += gridSize
         }
 
-        // Границы мира
+        // Границы
         canvas.drawRect(
             -camX, -camY,
             worldSize - camX, worldSize - camY,
@@ -449,19 +427,26 @@ class GameView(context: Context) : View(context) {
             }
         }
 
-        // ===== ИГРОК =====
+        // Игрок
         if (!isGameOver) {
             val segments = getSnakeSegments()
+
+            // Базовые компоненты скина
+            val baseR = (skinColor shr 16) and 0xFF
+            val baseG = (skinColor shr 8) and 0xFF
+            val baseB = skinColor and 0xFF
 
             for (i in segments.size - 1 downTo 1) {
                 val seg = segments[i]
                 val sx = seg.x - camX
                 val sy = seg.y - camY
 
+                // Затемняем от головы к хвосту
                 val t = 1f - (i.toFloat() / segments.size)
-                val r = (50 + 80 * t).toInt()
-                val g = (160 + 90 * t).toInt()
-                val b = (80 + 60 * t).toInt()
+                val factor = 0.55f + 0.45f * t
+                val r = (baseR * factor).toInt().coerceIn(0, 255)
+                val g = (baseG * factor).toInt().coerceIn(0, 255)
+                val b = (baseB * factor).toInt().coerceIn(0, 255)
                 paintSnakeBody.color = Color.rgb(r, g, b)
 
                 canvas.drawCircle(sx, sy, segmentRadius, paintSnakeBody)
@@ -470,6 +455,13 @@ class GameView(context: Context) : View(context) {
             val head = segments[0]
             val hx = head.x - camX
             val hy = head.y - camY
+
+            // Голова — ярче скина
+            val headR = (baseR + (255 - baseR) * 0.3f).toInt().coerceIn(0, 255)
+            val headG = (baseG + (255 - baseG) * 0.3f).toInt().coerceIn(0, 255)
+            val headB = (baseB + (255 - baseB) * 0.3f).toInt().coerceIn(0, 255)
+            paintSnakeHead.color = Color.rgb(headR, headG, headB)
+
             canvas.drawCircle(hx, hy, segmentRadius * 1.15f, paintSnakeHead)
 
             val eyeDist = segmentRadius * 0.55f
@@ -497,12 +489,11 @@ class GameView(context: Context) : View(context) {
             )
         }
 
-        // Джойстик (только когда не Game Over)
+        // UI
         if (!isGameOver) {
             canvas.drawCircle(joyCenterX, joyCenterY, joyRadius, paintJoyBase)
             canvas.drawCircle(joyKnobX, joyKnobY, joyRadius * 0.45f, paintJoyKnob)
 
-            // UI
             canvas.drawText("Score: $score", 40f, 70f, paintScore)
             canvas.drawText("Length: $snakeLength", 40f, 130f, paintScore)
             canvas.drawText("Best: $bestScore", 40f, 190f, paintScore)
@@ -510,7 +501,6 @@ class GameView(context: Context) : View(context) {
     }
 
     private fun drawGameOver(canvas: Canvas) {
-        // Затемнение
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paintOverlayBg)
 
         val cx = width / 2f
@@ -520,7 +510,6 @@ class GameView(context: Context) : View(context) {
         canvas.drawText("Score: $score", cx, cy + 20f, paintGameOverText)
         canvas.drawText("Best: $bestScore", cx, cy + 90f, paintGameOverText)
 
-        // Мигающая подсказка
         val blink = (SystemClock.uptimeMillis() / 500) % 2 == 0L
         if (blink) {
             canvas.drawText("Tap to restart", cx, cy + 200f, paintGameOverHint)
@@ -534,7 +523,6 @@ class GameView(context: Context) : View(context) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 if (isGameOver) {
-                    // Рестарт
                     startNewGame()
                     lastFrameTime = SystemClock.uptimeMillis()
                     return true

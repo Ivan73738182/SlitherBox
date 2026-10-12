@@ -4,95 +4,254 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Фон рисуется в MenuView -->
+    <!-- Фон -->
     <com.ivangames.slitherbox.MenuView
         android:id="@+id/menuView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Контент поверх -->
+    <!-- ===== ВЕРХНЯЯ ПАНЕЛЬ ===== -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:padding="8dp">
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:layout_gravity="top">
 
-        <!-- Название -->
+        <!-- ⚙️ Настройки -->
         <TextView
+            android:id="@+id/btnSettings"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:text="⚙️"
+            android:textSize="26sp"
+            android:gravity="center"
+            android:background="@drawable/btn_icon"
+            android:layout_marginEnd="10dp" />
+
+        <!-- 👤 Аватар -->
+        <TextView
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:text="🐍"
+            android:textSize="28sp"
+            android:gravity="center"
+            android:background="@drawable/btn_icon"
+            android:layout_marginEnd="10dp" />
+
+        <!-- Ник -->
+        <TextView
+            android:id="@+id/tvNick"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="SlitherBox"
+            android:text="IVAN"
             android:textColor="#FFFFFF"
-            android:textSize="32sp"
+            android:textSize="22sp"
             android:textStyle="bold"
-            android:shadowColor="#000000"
-            android:shadowDx="3"
-            android:shadowDy="3"
-            android:shadowRadius="6"
-            android:layout_marginBottom="10dp" />
+            android:layout_marginEnd="20dp" />
 
-        <!-- Кнопка ИГРАТЬ (большая, жёлтая) -->
+        <!-- 🌐 LAN -->
+        <TextView
+            android:id="@+id/btnLan"
+            android:layout_width="wrap_content"
+            android:layout_height="52dp"
+            android:text="🌐 LAN"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:background="@drawable/panel_blue" />
+
+        <!-- Растяжка -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- 🏆 ЛУЧШИЙ РЕЗУЛЬТАТ -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/panel_blue"
+            android:padding="10dp"
+            android:layout_marginEnd="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ЛУЧШИЙ РЕЗУЛЬТАТ"
+                android:textColor="#B0C8E0"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvBestScore"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 💰 Монеты -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="52dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/panel_blue"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:layout_marginEnd="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🪙"
+                android:textSize="22sp"
+                android:layout_marginEnd="6dp" />
+
+            <TextView
+                android:id="@+id/tvCoins"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 🐍 Скины -->
+        <TextView
+            android:id="@+id/btnSkins"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:text="🐍"
+            android:textSize="26sp"
+            android:gravity="center"
+            android:background="@drawable/btn_icon" />
+
+    </LinearLayout>
+
+    <!-- ===== НИЖНЯЯ ПАНЕЛЬ ===== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:layout_gravity="bottom">
+
+        <!-- 🪙 3 монеты -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="60dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/panel_blue"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:layout_marginEnd="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🪙 3 монеты"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 📋 Квесты -->
+        <LinearLayout
+            android:id="@+id/btnQuests"
+            android:layout_width="wrap_content"
+            android:layout_height="60dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/panel_blue"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:layout_marginEnd="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📋"
+                android:textSize="24sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="КВЕСТЫ"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 🐍 Скины по центру -->
+        <LinearLayout
+            android:id="@+id/btnSnakeSkin"
+            android:layout_width="0dp"
+            android:layout_height="60dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/panel_blue"
+            android:layout_marginEnd="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✏️ ОТРЕДАКТИРУЙТЕ ЗМЕЮ"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 🏆 Рекорды -->
+        <LinearLayout
+            android:id="@+id/btnRecords"
+            android:layout_width="wrap_content"
+            android:layout_height="60dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/panel_blue"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:layout_marginEnd="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🏆"
+                android:textSize="24sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="РЕКОРДЫ"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 🟡 БОЛЬШАЯ КНОПКА ИГРАТЬ -->
         <Button
             android:id="@+id/btnPlay"
-            android:layout_width="300dp"
-            android:layout_height="56dp"
+            android:layout_width="240dp"
+            android:layout_height="80dp"
             android:text="▶  ИГРАТЬ"
-            android:textSize="22sp"
+            android:textSize="28sp"
             android:textStyle="bold"
             android:textColor="#3A2A00"
             android:background="@drawable/btn_yellow"
-            android:stateListAnimator="@null"
-            android:elevation="0dp"
-            android:padding="0dp"
-            android:minHeight="0dp"
-            android:minWidth="0dp"
-            android:layout_marginBottom="8dp" />
-
-        <!-- Кнопка РЕКОРДЫ -->
-        <Button
-            android:id="@+id/btnRecords"
-            android:layout_width="300dp"
-            android:layout_height="50dp"
-            android:text="🏆  РЕКОРДЫ"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/btn_blue"
-            android:stateListAnimator="@null"
-            android:elevation="0dp"
-            android:padding="0dp"
-            android:minHeight="0dp"
-            android:minWidth="0dp"
-            android:layout_marginBottom="6dp" />
-
-        <!-- Кнопка LAN -->
-        <Button
-            android:id="@+id/btnLan"
-            android:layout_width="300dp"
-            android:layout_height="50dp"
-            android:text="🌐  LAN ИГРА"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/btn_blue"
-            android:stateListAnimator="@null"
-            android:elevation="0dp"
-            android:padding="0dp"
-            android:minHeight="0dp"
-            android:minWidth="0dp"
-            android:layout_marginBottom="6dp" />
-
-        <!-- Кнопка ВЫХОД -->
-        <Button
-            android:id="@+id/btnExit"
-            android:layout_width="300dp"
-            android:layout_height="50dp"
-            android:text="🚪  ВЫХОД"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/btn_red"
             android:stateListAnimator="@null"
             android:elevation="0dp"
             android:padding="0dp"
