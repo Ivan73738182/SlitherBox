@@ -19,13 +19,13 @@ class GameView(context: Context) : View(context) {
     private val worldSize = 2000f
     private val foodRadius = 8f
     private val segmentRadius = 12f
-    private val segmentSpacing = 14f       // расстояние между сегментами
-    private var snakeLength = 5            // сколько сегментов у змейки
-    private var score = 0                  // счёт
+    private val segmentSpacing = 14f
+    private var snakeLength = 5
+    private var score = 0
 
-    // ===== ЗМЕЙКА (через трейл) =====
-    private val trail = mutableListOf<PointF>()   // история позиций головы (последняя — в конце)
-    private val maxTrailLength = 5000             // ограничение, чтобы не жрало память
+    // ===== ЗМЕЙКА (трейл) =====
+    private val trail = mutableListOf<PointF>()
+    private val maxTrailLength = 5000
     private var headAngle = 0f
     private val baseSpeed = 4.5f
 
@@ -95,14 +95,12 @@ class GameView(context: Context) : View(context) {
         val startX = worldSize / 2f
         val startY = worldSize / 2f
 
-        // Стартовый трейл — 5 точек влево от старта
         for (i in 0 until 200) {
             trail.add(PointF(startX - i * 2f, startY))
         }
 
         headAngle = 0f
 
-        // Спавним еду
         repeat(200) {
             foods.add(Food(
                 (50..(worldSize.toInt() - 50)).random().toFloat(),
@@ -138,7 +136,6 @@ class GameView(context: Context) : View(context) {
     private fun update(dt: Long) {
         val speed = baseSpeed * (dt / 16.67f)
 
-        // Поворот головы по джойстику
         if (joyActive) {
             val targetAngle = atan2(joyVectorY, joyVectorX)
             var diff = targetAngle - headAngle
@@ -149,59 +146,54 @@ class GameView(context: Context) : View(context) {
             headAngle += diff.coerceIn(-turnSpeed, turnSpeed)
         }
 
-        // Двигаем голову
         val head = trail.last()
         val newHeadX = head.x + cos(headAngle) * speed
         val newHeadY = head.y + sin(headAngle) * speed
 
-        // Границы мира — отталкивание
         val clampedX = newHeadX.coerceIn(segmentRadius, worldSize - segmentRadius)
         val clampedY = newHeadY.coerceIn(segmentRadius, worldSize - segmentRadius)
 
         trail.add(PointF(clampedX, clampedY))
 
-        // Ограничиваем память
         while (trail.size > maxTrailLength) {
             trail.removeAt(0)
         }
 
-        // Съедание еды
-private fun checkFoodCollision(hx: Float, hy: Float) {
-    val newFoods = mutableListOf<Food>()  // ← сюда собираем новые точки
-    val iter = foods.iterator()
-    while (iter.hasNext()) {
-        val food = iter.next()
-        val dx = food.x - hx
-        val dy = food.y - hy
-        if (sqrt(dx * dx + dy * dy) < segmentRadius + foodRadius) {
-            iter.remove()
-            score += 1
+        checkFoodCollision(clampedX, clampedY)
 
-            // Каждые 10 очков — +1 сегмент
-            if (score % 10 == 0) {
-                snakeLength += 1
+        camX = clampedX - width / 2f
+        camY = clampedY - height / 2f
+    }
+
+    private fun checkFoodCollision(hx: Float, hy: Float) {
+        val newFoods = mutableListOf<Food>()
+        val iter = foods.iterator()
+        while (iter.hasNext()) {
+            val food = iter.next()
+            val dx = food.x - hx
+            val dy = food.y - hy
+            if (sqrt(dx * dx + dy * dy) < segmentRadius + foodRadius) {
+                iter.remove()
+                score += 1
+
+                if (score % 10 == 0) {
+                    snakeLength += 1
+                }
+
+                newFoods.add(Food(
+                    (50..(worldSize.toInt() - 50)).random().toFloat(),
+                    (50..(worldSize.toInt() - 50)).random().toFloat()
+                ))
             }
-
-            // Собираем новый респавн
-            newFoods.add(Food(
-                (50..(worldSize.toInt() - 50)).random().toFloat(),
-                (50..(worldSize.toInt() - 50)).random().toFloat()
-            ))
         }
-    }
-    // Добавляем после итерации — безопасно
-    foods.addAll(newFoods)
-}
+        foods.addAll(newFoods)
     }
 
-    // Возвращает позиции сегментов змейки (от головы к хвосту)
     private fun getSnakeSegments(): List<PointF> {
         val result = mutableListOf<PointF>()
 
-        // Голова — последняя точка трейла
         result.add(trail.last())
 
-        // Идём по трейлу с конца к началу, набирая точки на нужном расстоянии
         var needDist = segmentSpacing.toDouble()
         var i = trail.size - 2
         var accumulated = 0.0
@@ -214,7 +206,6 @@ private fun checkFoodCollision(hx: Float, hy: Float) {
             val d = sqrt(dx * dx + dy * dy)
 
             if (accumulated + d >= needDist) {
-                // Интерполируем точку на нужном расстоянии
                 val t = (needDist - accumulated) / d
                 val px = (a.x + (b.x - a.x) * t).toFloat()
                 val py = (a.y + (b.y - a.y) * t).toFloat()
@@ -227,7 +218,6 @@ private fun checkFoodCollision(hx: Float, hy: Float) {
             i--
         }
 
-        // Если трейл короткий — добиваем оставшиеся сегменты в конце
         while (result.size < snakeLength) {
             result.add(PointF(trail[0].x, trail[0].y))
         }
@@ -238,7 +228,6 @@ private fun checkFoodCollision(hx: Float, hy: Float) {
     private fun drawWorld(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 30, 50))
 
-        // Сетка
         val gridSize = 100f
         val gridStartX = -(camX % gridSize)
         val gridStartY = -(camY % gridSize)
@@ -253,14 +242,12 @@ private fun checkFoodCollision(hx: Float, hy: Float) {
             y += gridSize
         }
 
-        // Границы мира
         canvas.drawRect(
             -camX, -camY,
             worldSize - camX, worldSize - camY,
             paintBorder
         )
 
-        // Еда (только то, что видно)
         for (food in foods) {
             val sx = food.x - camX
             val sy = food.y - camY
@@ -269,10 +256,8 @@ private fun checkFoodCollision(hx: Float, hy: Float) {
             }
         }
 
-        // Змейка
         val segments = getSnakeSegments()
 
-        // Рисуем с хвоста к голове
         for (i in segments.size - 1 downTo 1) {
             val seg = segments[i]
             val sx = seg.x - camX
@@ -287,13 +272,11 @@ private fun checkFoodCollision(hx: Float, hy: Float) {
             canvas.drawCircle(sx, sy, segmentRadius, paintSnakeBody)
         }
 
-        // Голова
         val head = segments[0]
         val hx = head.x - camX
         val hy = head.y - camY
         canvas.drawCircle(hx, hy, segmentRadius * 1.15f, paintSnakeHead)
 
-        // Глаза
         val eyeDist = segmentRadius * 0.55f
         val perpX = cos(headAngle + Math.PI.toFloat() / 2)
         val perpY = sin(headAngle + Math.PI.toFloat() / 2)
@@ -318,11 +301,9 @@ private fun checkFoodCollision(hx: Float, hy: Float) {
             segmentRadius * 0.18f, paintEyeBlack
         )
 
-        // Джойстик
         canvas.drawCircle(joyCenterX, joyCenterY, joyRadius, paintJoyBase)
         canvas.drawCircle(joyKnobX, joyKnobY, joyRadius * 0.45f, paintJoyKnob)
 
-        // Счёт
         canvas.drawText("Score: $score", 40f, 70f, paintScore)
         canvas.drawText("Length: $snakeLength", 40f, 130f, paintScore)
     }
