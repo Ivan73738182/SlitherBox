@@ -1,6 +1,6 @@
 package com.ivangames.slitherbox
 
-import android.os.Build
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
@@ -13,7 +13,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Полный экран (безопасный способ для AppCompat)
         window.setFlags(
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -26,7 +25,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hideSystemUI() {
-        // Скрываем статус-бар и навигацию
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
@@ -41,5 +39,15 @@ class MainActivity : AppCompatActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideSystemUI()
+    }
+
+    /**
+     * Кнопка "Назад" — возвращает в меню (не закрывает приложение).
+     */
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        // Возврат в меню
+        startActivity(Intent(this, MenuActivity::class.java))
+        finish()
     }
 }

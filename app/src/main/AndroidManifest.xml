@@ -7,8 +7,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SlitherBox">
 
+        <!-- Меню — теперь главный экран -->
         <activity
-            android:name=".MainActivity"
+            android:name=".MenuActivity"
             android:exported="true"
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden">
@@ -17,6 +18,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Игра -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
     </application>
 
