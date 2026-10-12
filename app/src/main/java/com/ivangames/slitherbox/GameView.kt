@@ -34,8 +34,20 @@ class GameView(context: Context) : View(context) {
     private var camY = 0f
 
     // ===== ЕДА =====
-    private data class Food(val x: Float, val y: Float)
+    private data class Food(val x: Float, val y: Float, val color: Int)
     private val foods = mutableListOf<Food>()
+
+    // ===== ПАЛИТРА ЕДЫ =====
+    private val foodColors = intArrayOf(
+        Color.rgb(80, 220, 120),    // зелёный
+        Color.rgb(255, 100, 100),   // красный
+        Color.rgb(255, 220, 100),   // жёлтый
+        Color.rgb(100, 180, 255),   // голубой
+        Color.rgb(200, 120, 255),   // фиолетовый
+        Color.rgb(255, 160, 80),    // оранжевый
+        Color.rgb(255, 120, 200),   // розовый
+        Color.rgb(120, 255, 240)    // бирюзовый
+    )
 
     // ===== БОТЫ =====
     private val bots = mutableListOf<BotSnake>()
@@ -61,7 +73,6 @@ class GameView(context: Context) : View(context) {
         strokeWidth = 6f
     }
     private val paintFood = Paint().apply {
-        color = Color.rgb(80, 220, 120)
         isAntiAlias = true
     }
     private val paintSnakeBody = Paint().apply { isAntiAlias = true }
@@ -106,21 +117,18 @@ class GameView(context: Context) : View(context) {
 
         headAngle = 0f
 
-        // Спавним еду
+        // Еда
         repeat(200) {
-            foods.add(Food(
-                (50..(worldSize.toInt() - 50)).random().toFloat(),
-                (50..(worldSize.toInt() - 50)).random().toFloat()
-            ))
+            foods.add(spawnFood())
         }
 
-        // Спавним 5 ботов
+        // Боты
         val botColors = listOf(
-            Color.rgb(255, 100, 100) to Color.rgb(255, 150, 150),  // красный
-            Color.rgb(255, 220, 100) to Color.rgb(255, 240, 160),  // жёлтый
-            Color.rgb(180, 120, 255) to Color.rgb(210, 170, 255),  // фиолетовый
-            Color.rgb(255, 160, 80)  to Color.rgb(255, 200, 130),  // оранжевый
-            Color.rgb(100, 200, 255) to Color.rgb(160, 230, 255)   // голубой
+            Color.rgb(255, 100, 100) to Color.rgb(255, 150, 150),
+            Color.rgb(255, 220, 100) to Color.rgb(255, 240, 160),
+            Color.rgb(180, 120, 255) to Color.rgb(210, 170, 255),
+            Color.rgb(255, 160, 80)  to Color.rgb(255, 200, 130),
+            Color.rgb(100, 200, 255) to Color.rgb(160, 230, 255)
         )
 
         val margin = 300f
@@ -132,6 +140,16 @@ class GameView(context: Context) : View(context) {
         }
 
         lastFrameTime = SystemClock.uptimeMillis()
+    }
+
+    private fun randomFoodColor(): Int = foodColors.random()
+
+    private fun spawnFood(): Food {
+        return Food(
+            (50..(worldSize.toInt() - 50)).random().toFloat(),
+            (50..(worldSize.toInt() - 50)).random().toFloat(),
+            randomFoodColor()
+        )
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -197,11 +215,7 @@ class GameView(context: Context) : View(context) {
             for (food in foods) {
                 if (bot.tryEat(food.x, food.y)) {
                     eatenFoods.add(food)
-                    // Спавним новую еду
-                    foods.add(Food(
-                        (50..(worldSize.toInt() - 50)).random().toFloat(),
-                        (50..(worldSize.toInt() - 50)).random().toFloat()
-                    ))
+                    foods.add(spawnFood())
                     break
                 }
             }
@@ -228,10 +242,7 @@ class GameView(context: Context) : View(context) {
                     snakeLength += 1
                 }
 
-                newFoods.add(Food(
-                    (50..(worldSize.toInt() - 50)).random().toFloat(),
-                    (50..(worldSize.toInt() - 50)).random().toFloat()
-                ))
+                newFoods.add(spawnFood())
             }
         }
         foods.addAll(newFoods)
@@ -298,11 +309,12 @@ class GameView(context: Context) : View(context) {
             paintBorder
         )
 
-        // Еда
+        // Еда (разноцветная)
         for (food in foods) {
             val sx = food.x - camX
             val sy = food.y - camY
             if (sx > -20 && sx < width + 20 && sy > -20 && sy < height + 20) {
+                paintFood.color = food.color
                 canvas.drawCircle(sx, sy, foodRadius, paintFood)
             }
         }
