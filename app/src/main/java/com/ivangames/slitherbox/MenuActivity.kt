@@ -2,10 +2,12 @@ package com.ivangames.slitherbox
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
 class MenuActivity : AppCompatActivity() {
@@ -13,27 +15,39 @@ class MenuActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Полный экран
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN
-        )
+        try {
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN
+            )
 
-        setContentView(R.layout.activity_menu)
-        hideSystemUI()
+            setContentView(R.layout.activity_menu)
+            hideSystemUI()
 
-        // Кнопки
-        findViewById<Button>(R.id.btnPlay).setOnClickListener {
-            startActivity(Intent(this, MainActivity::class.java))
+            findViewById<Button>(R.id.btnPlay).setOnClickListener {
+                startActivity(Intent(this, MainActivity::class.java))
+            }
+
+            findViewById<Button>(R.id.btnRecords).setOnClickListener {
+                showRecordsDialog()
+            }
+
+            findViewById<Button>(R.id.btnExit).setOnClickListener {
+                finishAffinity()
+            }
+        } catch (e: Throwable) {
+            showError(e)
         }
+    }
 
-        findViewById<Button>(R.id.btnRecords).setOnClickListener {
-            showRecordsDialog()
-        }
-
-        findViewById<Button>(R.id.btnExit).setOnClickListener {
-            finishAffinity()
-        }
+    private fun showError(e: Throwable) {
+        val tv = TextView(this)
+        tv.text = "ОШИБКА:\n\n${e.message}\n\n${e.stackTraceToString().take(2000)}"
+        tv.setTextColor(Color.WHITE)
+        tv.textSize = 12f
+        tv.setPadding(20, 20, 20, 20)
+        tv.setBackgroundColor(Color.BLACK)
+        setContentView(tv)
     }
 
     private fun showRecordsDialog() {
