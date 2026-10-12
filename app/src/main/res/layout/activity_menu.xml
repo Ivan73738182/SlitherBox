@@ -16,7 +16,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:padding="20dp">
+        android:padding="8dp">
 
         <!-- Название -->
         <TextView
@@ -24,68 +24,80 @@
             android:layout_height="wrap_content"
             android:text="SlitherBox"
             android:textColor="#FFFFFF"
-            android:textSize="56sp"
+            android:textSize="32sp"
             android:textStyle="bold"
             android:shadowColor="#000000"
-            android:shadowDx="4"
-            android:shadowDy="4"
-            android:shadowRadius="8"
-            android:layout_marginBottom="24dp" />
+            android:shadowDx="3"
+            android:shadowDy="3"
+            android:shadowRadius="6"
+            android:layout_marginBottom="10dp" />
 
         <!-- Кнопка ИГРАТЬ (большая, жёлтая) -->
         <Button
             android:id="@+id/btnPlay"
-            android:layout_width="320dp"
-            android:layout_height="80dp"
+            android:layout_width="300dp"
+            android:layout_height="56dp"
             android:text="▶  ИГРАТЬ"
-            android:textSize="28sp"
+            android:textSize="22sp"
             android:textStyle="bold"
             android:textColor="#3A2A00"
             android:background="@drawable/btn_yellow"
             android:stateListAnimator="@null"
             android:elevation="0dp"
-            android:layout_marginBottom="16dp" />
+            android:padding="0dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:layout_marginBottom="8dp" />
 
         <!-- Кнопка РЕКОРДЫ -->
         <Button
             android:id="@+id/btnRecords"
-            android:layout_width="320dp"
-            android:layout_height="70dp"
+            android:layout_width="300dp"
+            android:layout_height="50dp"
             android:text="🏆  РЕКОРДЫ"
-            android:textSize="24sp"
+            android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
             android:background="@drawable/btn_blue"
             android:stateListAnimator="@null"
             android:elevation="0dp"
-            android:layout_marginBottom="14dp" />
+            android:padding="0dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:layout_marginBottom="6dp" />
 
         <!-- Кнопка LAN -->
         <Button
             android:id="@+id/btnLan"
-            android:layout_width="320dp"
-            android:layout_height="70dp"
+            android:layout_width="300dp"
+            android:layout_height="50dp"
             android:text="🌐  LAN ИГРА"
-            android:textSize="24sp"
+            android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
             android:background="@drawable/btn_blue"
             android:stateListAnimator="@null"
             android:elevation="0dp"
-            android:layout_marginBottom="14dp" />
+            android:padding="0dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:layout_marginBottom="6dp" />
 
         <!-- Кнопка ВЫХОД -->
         <Button
             android:id="@+id/btnExit"
-            android:layout_width="320dp"
-            android:layout_height="70dp"
+            android:layout_width="300dp"
+            android:layout_height="50dp"
             android:text="🚪  ВЫХОД"
-            android:textSize="24sp"
+            android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
             android:background="@drawable/btn_red"
             android:stateListAnimator="@null"
-            android:elevation="0dp" />
+            android:elevation="0dp"
+            android:padding="0dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp" />
 
     </LinearLayout>
 
