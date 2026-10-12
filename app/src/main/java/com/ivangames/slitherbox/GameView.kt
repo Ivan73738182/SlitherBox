@@ -166,35 +166,32 @@ class GameView(context: Context) : View(context) {
         }
 
         // Съедание еды
-        checkFoodCollision(clampedX, clampedY)
+private fun checkFoodCollision(hx: Float, hy: Float) {
+    val newFoods = mutableListOf<Food>()  // ← сюда собираем новые точки
+    val iter = foods.iterator()
+    while (iter.hasNext()) {
+        val food = iter.next()
+        val dx = food.x - hx
+        val dy = food.y - hy
+        if (sqrt(dx * dx + dy * dy) < segmentRadius + foodRadius) {
+            iter.remove()
+            score += 1
 
-        // Камера за головой
-        camX = clampedX - width / 2f
-        camY = clampedY - height / 2f
-    }
-
-    private fun checkFoodCollision(hx: Float, hy: Float) {
-        val iter = foods.iterator()
-        while (iter.hasNext()) {
-            val food = iter.next()
-            val dx = food.x - hx
-            val dy = food.y - hy
-            if (sqrt(dx * dx + dy * dy) < segmentRadius + foodRadius) {
-                iter.remove()
-                score += 1
-
-                // Каждые 10 очков — +1 сегмент
-                if (score % 10 == 0) {
-                    snakeLength += 1
-                }
-
-                // Респавн еды в новом месте
-                foods.add(Food(
-                    (50..(worldSize.toInt() - 50)).random().toFloat(),
-                    (50..(worldSize.toInt() - 50)).random().toFloat()
-                ))
+            // Каждые 10 очков — +1 сегмент
+            if (score % 10 == 0) {
+                snakeLength += 1
             }
+
+            // Собираем новый респавн
+            newFoods.add(Food(
+                (50..(worldSize.toInt() - 50)).random().toFloat(),
+                (50..(worldSize.toInt() - 50)).random().toFloat()
+            ))
         }
+    }
+    // Добавляем после итерации — безопасно
+    foods.addAll(newFoods)
+}
     }
 
     // Возвращает позиции сегментов змейки (от головы к хвосту)
