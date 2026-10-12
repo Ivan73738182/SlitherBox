@@ -4,16 +4,23 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PointF
 import android.os.SystemClock
+import android.util.AttributeSet
 import android.view.View
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * Фон меню: гексагональная сетка + ползающие декоративные змейки.
  */
-class MenuView(context: Context) : View(context) {
+class MenuView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : View(context, attrs, defStyleAttr) {
 
     // ===== ДЕКОРАТИВНЫЕ ЗМЕЙКИ =====
     private data class DecoSnake(
@@ -27,14 +34,14 @@ class MenuView(context: Context) : View(context) {
     private val decoSnakes = mutableListOf<DecoSnake>()
     private val segmentRadius = 14f
     private val segmentSpacing = 16f
-    private val trailLength = 40  // длина декоративной змейки (короткая)
+    private val trailLength = 40
 
     // ===== КРАСКИ =====
     private val paintBg = Paint().apply {
         color = Color.rgb(15, 22, 40)
     }
     private val paintHex = Paint().apply {
-        color = Color.rgb(30, 45, 70)
+        color = Color.rgb(35, 55, 85)
         style = Paint.Style.STROKE
         strokeWidth = 2f
         isAntiAlias = true
@@ -49,9 +56,9 @@ class MenuView(context: Context) : View(context) {
 
     private fun initIfNeeded() {
         if (initialized) return
+        if (width <= 0 || height <= 0) return
         initialized = true
 
-        // Спавним 3 декоративные змейки разных цветов
         val colors = listOf(
             Color.rgb(80, 220, 120) to Color.rgb(140, 255, 170),
             Color.rgb(255, 180, 80) to Color.rgb(255, 220, 130),
@@ -59,12 +66,12 @@ class MenuView(context: Context) : View(context) {
         )
 
         for ((body, head) in colors) {
-            val startX = (0..width.coerceAtLeast(1)).random().toFloat()
-            val startY = (0..height.coerceAtLeast(1)).random().toFloat()
+            val startX = (0..width).random().toFloat()
+            val startY = (0..height).random().toFloat()
             val angle = (Math.random() * 2 * Math.PI).toFloat()
 
             val trail = mutableListOf<PointF>()
-            for (i in 0 until 100) {
+            for (i in 0 until 400) {
                 trail.add(PointF(
                     startX - cos(angle) * i * 2f,
                     startY - sin(angle) * i * 2f
@@ -100,10 +107,8 @@ class MenuView(context: Context) : View(context) {
         val speedFactor = dt / 16.67f
 
         for (snake in decoSnakes) {
-            // Плавный случайный поворот
             snake.headAngle += (Math.random().toFloat() - 0.5f) * 0.05f * speedFactor
 
-            // Отскок от краёв
             val head = snake.trail.last()
             if (head.x < 50f) snake.headAngle = 0f
             if (head.x > width - 50f) snake.headAngle = Math.PI.toFloat()
@@ -115,20 +120,18 @@ class MenuView(context: Context) : View(context) {
 
             snake.trail.add(PointF(newX, newY))
 
-            // Ограничиваем длину трейла
-            while (snake.trail.size > trailLength * 10) {
+            while (snake.trail.size > 500) {
                 snake.trail.removeAt(0)
             }
         }
     }
 
     private fun drawBg(canvas: Canvas) {
-        // Фон
         canvas.drawColor(paintBg.color)
 
         // Гексагональная сетка
-        val hexSize = 60f
-        val hexWidth = hexSize * 1.732f  // √3 * size
+        val hexSize = 50f
+        val hexWidth = hexSize * 1.732f
         val hexHeight = hexSize * 2f
         val vertSpacing = hexHeight * 0.75f
 
@@ -147,7 +150,7 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawHexagon(canvas: Canvas, cx: Float, cy: Float, size: Float) {
-        val path = android.graphics.Path()
+        val path = Path()
         for (i in 0 until 6) {
             val angle = (Math.PI / 3 * i).toFloat() - (Math.PI / 6).toFloat()
             val px = cx + cos(angle) * size
@@ -163,7 +166,6 @@ class MenuView(context: Context) : View(context) {
         val headPaint = Paint().apply { isAntiAlias = true }
 
         for (snake in decoSnakes) {
-            // Получаем сегменты по трейлу
             val segments = mutableListOf<PointF>()
             if (snake.trail.isEmpty()) continue
             segments.add(snake.trail.last())
@@ -177,7 +179,7 @@ class MenuView(context: Context) : View(context) {
                 val b = snake.trail[i]
                 val dx = (b.x - a.x).toDouble()
                 val dy = (b.y - a.y).toDouble()
-                val d = kotlin.math.sqrt(dx * dx + dy * dy)
+                val d = sqrt(dx * dx + dy * dy)
 
                 if (accumulated + d >= needDist) {
                     val t = (needDist - accumulated) / d
