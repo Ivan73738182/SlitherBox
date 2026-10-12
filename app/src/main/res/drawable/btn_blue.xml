@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Тень снизу -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#1A2A3A" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+
+    <!-- Сама кнопка со сдвигом вверх -->
+    <item android:top="4dp" android:bottom="4dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#5A7A9A"
+                android:centerColor="#3E5A78"
+                android:endColor="#2A4055"
+                android:type="linear" />
+            <corners android:radius="14dp" />
+            <stroke
+                android:width="2dp"
+                android:color="#8AA8C8" />
+        </shape>
+    </item>
+
+</layer-list>

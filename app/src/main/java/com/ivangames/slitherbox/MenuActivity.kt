@@ -8,6 +8,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 class MenuActivity : AppCompatActivity() {
@@ -24,14 +25,22 @@ class MenuActivity : AppCompatActivity() {
             setContentView(R.layout.activity_menu)
             hideSystemUI()
 
+            // Играть
             findViewById<Button>(R.id.btnPlay).setOnClickListener {
                 startActivity(Intent(this, MainActivity::class.java))
             }
 
+            // Рекорды
             findViewById<Button>(R.id.btnRecords).setOnClickListener {
                 showRecordsDialog()
             }
 
+            // LAN
+            findViewById<Button>(R.id.btnLan).setOnClickListener {
+                Toast.makeText(this, "🌐 LAN скоро появится!", Toast.LENGTH_SHORT).show()
+            }
+
+            // Выход
             findViewById<Button>(R.id.btnExit).setOnClickListener {
                 finishAffinity()
             }
