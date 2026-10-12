@@ -23,7 +23,7 @@ class BotSnake(
     val trail = mutableListOf<PointF>()
     var headAngle = startAngle
     var length = 5
-    var score = 0          // счётчик съеденного — для роста (10 → +1 сегмент)
+    var score = 0
     var alive = true
     var age = 0f
 
@@ -39,35 +39,87 @@ class BotSnake(
         }
     }
 
-    fun update(dt: Long, foods: List<PointF>) {
+    /**
+     * Обновление бота.
+     * @param enemies список чужих сегментов (все сегменты других змей + игрока)
+     *                 — для избегания. Формат: список точек.
+     */
+    fun update(dt: Long, foods: List<PointF>, enemySegments: List<PointF>) {
         if (!alive) return
 
         val speedThisFrame = speed * (dt / 16.67f)
         age += dt
 
-        // AI: цель
-        retargetCooldown -= dt
-        if (retargetCooldown <= 0f || targetFood == null) {
-            targetFood = findNearestFood(foods)
-            retargetCooldown = 300f
+        val head = trail.last()
+
+        // ===== ПРОВЕРКА СМЕРТИ ОТ СТЕН =====
+        val wallMargin = segmentRadius
+        if (head.x < wallMargin || head.x > worldSize - wallMargin ||
+            head.y < wallMargin || head.y > worldSize - wallMargin
+        ) {
+            alive = false
+            return
         }
 
-        val head = trail.last()
+        // ===== ПРОВЕРКА СТОЛКНОВЕНИЯ С ЧУЖИМИ СЕГМЕНТАМИ =====
+        val dangerRadius = segmentRadius * 2.5f  // радиус обнаружения опасности
+        for (seg in enemySegments) {
+            val dx = seg.x - head.x
+            val dy = seg.y - head.y
+            if (dx * dx + dy * dy < (segmentRadius * 1.5f) * (segmentRadius * 1.5f)) {
+                // Касание = смерть
+                alive = false
+                return
+            }
+        }
+
+        // ===== AI =====
+        // Ищем ближайшую опасность (сегмент врага) в радиусе
+        var dangerSegment: PointF? = null
+        var dangerDist = Float.MAX_VALUE
+        for (seg in enemySegments) {
+            val dx = seg.x - head.x
+            val dy = seg.y - head.y
+            val d = dx * dx + dy * dy
+            if (d < dangerRadius * dangerRadius && d < dangerDist) {
+                dangerDist = d
+                dangerSegment = seg
+            }
+        }
+
+        // Стена рядом?
+        val nearWallDist = 150f
+        val nearWall = head.x < nearWallDist || head.x > worldSize - nearWallDist ||
+                head.y < nearWallDist || head.y > worldSize - nearWallDist
+
         var targetAngle = headAngle
 
-        // Избегаем границ
-        val margin = 100f
-        val nearWall = head.x < margin || head.x > worldSize - margin ||
-                head.y < margin || head.y > worldSize - margin
-
-        if (nearWall) {
-            val toCenterX = worldSize / 2f - head.x
-            val toCenterY = worldSize / 2f - head.y
-            targetAngle = atan2(toCenterY, toCenterX)
-        } else if (targetFood != null) {
-            val dx = targetFood!!.x - head.x
-            val dy = targetFood!!.y - head.y
-            targetAngle = atan2(dy, dx)
+        when {
+            // 1. Опасность — уходим
+            dangerSegment != null -> {
+                val dx = head.x - dangerSegment.x
+                val dy = head.y - dangerSegment.y
+                targetAngle = atan2(dy, dx)
+            }
+            // 2. Стена близко — к центру
+            nearWall -> {
+                val toCenterX = worldSize / 2f - head.x
+                val toCenterY = worldSize / 2f - head.y
+                targetAngle = atan2(toCenterY, toCenterX)
+            }
+            // 3. Еда — идём
+            else -> {
+                retargetCooldown -= dt
+                if (retargetCooldown <= 0f || targetFood == null) {
+                    targetFood = findBestFood(foods, head)
+                    retargetCooldown = 300f
+                }
+                if (targetFood != null) {
+                    val dx = targetFood!!.x - head.x
+                    val dy = targetFood!!.y - head.y
+                    targetAngle = atan2(dy, dx)
+                }
+            }
         }
 
         // Плавный поворот
@@ -75,28 +127,22 @@ class BotSnake(
         while (diff > Math.PI) diff -= (2 * Math.PI).toFloat()
         while (diff < -Math.PI) diff += (2 * Math.PI).toFloat()
 
-        val turnSpeed = 0.08f * (dt / 16.67f)
+        val turnSpeed = 0.09f * (dt / 16.67f)
         headAngle += diff.coerceIn(-turnSpeed, turnSpeed)
 
-        // Двигаем голову
+        // Двигаем
         val newHeadX = head.x + cos(headAngle) * speedThisFrame
         val newHeadY = head.y + sin(headAngle) * speedThisFrame
 
-        val clampedX = newHeadX.coerceIn(segmentRadius, worldSize - segmentRadius)
-        val clampedY = newHeadY.coerceIn(segmentRadius, worldSize - segmentRadius)
-
-        trail.add(PointF(clampedX, clampedY))
+        trail.add(PointF(newHeadX, newHeadY))
 
         while (trail.size > 2000) {
             trail.removeAt(0)
         }
     }
 
-    /**
-     * Проверяет, съел ли бот еду.
-     * Растёт по той же логике, что игрок: 10 съеденных → +1 сегмент.
-     */
     fun tryEat(foodX: Float, foodY: Float): Boolean {
+        if (!alive) return false
         val head = trail.last()
         val dx = foodX - head.x
         val dy = foodY - head.y
@@ -146,9 +192,12 @@ class BotSnake(
         return result
     }
 
-    private fun findNearestFood(foods: List<PointF>): PointF? {
+    /**
+     * Ищет лучшую еду: не ближайшую, а случайную из топ-15.
+     * Так боты не собираются в одну точку.
+     */
+    private fun findBestFood(foods: List<PointF>, head: PointF): PointF? {
         if (foods.isEmpty()) return null
-        val head = trail.last()
 
         val candidates = mutableListOf<Pair<PointF, Float>>()
         for (f in foods) {
@@ -158,8 +207,7 @@ class BotSnake(
             candidates.add(f to d)
         }
         candidates.sortBy { it.second }
-
-        val topN = candidates.take(20)
+        val topN = candidates.take(15)
         return if (topN.isNotEmpty()) topN.random().first else null
     }
 
