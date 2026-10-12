@@ -16,16 +16,18 @@ import kotlin.math.sqrt
 class GameView(context: Context) : View(context) {
 
     // ===== ИГРОВОЙ МИР =====
-    private val worldSize = 2000f          // размер мира (квадрат)
-    private val foodRadius = 8f            // радиус еды
-    private val segmentRadius = 12f        // радиус одного сегмента змейки
-    private val segmentSpacing = 12f       // расстояние между сегментами (для плавности)
-    private val startSegments = 5          // стартовая длина змейки
+    private val worldSize = 2000f
+    private val foodRadius = 8f
+    private val segmentRadius = 12f
+    private val segmentSpacing = 14f       // расстояние между сегментами
+    private var snakeLength = 5            // сколько сегментов у змейки
+    private var score = 0                  // счёт
 
-    // ===== ЗМЕЙКА =====
-    private val segments = mutableListOf<PointF>()   // точки тела, [0] — голова
-    private var headAngle = 0f              // угол поворота головы (радианы)
-    private val baseSpeed = 3.5f            // базовая скорость (пикселей/кадр)
+    // ===== ЗМЕЙКА (через трейл) =====
+    private val trail = mutableListOf<PointF>()   // история позиций головы (последняя — в конце)
+    private val maxTrailLength = 5000             // ограничение, чтобы не жрало память
+    private var headAngle = 0f
+    private val baseSpeed = 4.5f
 
     // ===== КАМЕРА =====
     private var camX = 0f
@@ -35,7 +37,7 @@ class GameView(context: Context) : View(context) {
     private data class Food(val x: Float, val y: Float)
     private val foods = mutableListOf<Food>()
 
-    // ===== УПРАВЛЕНИЕ (джойстик) =====
+    // ===== ДЖОЙСТИК =====
     private var joyCenterX = 0f
     private var joyCenterY = 0f
     private var joyRadius = 0f
@@ -46,21 +48,22 @@ class GameView(context: Context) : View(context) {
     private var joyVectorY = 0f
 
     // ===== КРАСКИ =====
-    private val paintBg = Paint().apply { color = Color.rgb(20, 30, 50) }
     private val paintGrid = Paint().apply {
         color = Color.rgb(30, 45, 70)
         strokeWidth = 1f
+    }
+    private val paintBorder = Paint().apply {
+        color = Color.rgb(255, 80, 80)
+        style = Paint.Style.STROKE
+        strokeWidth = 6f
     }
     private val paintFood = Paint().apply {
         color = Color.rgb(80, 220, 120)
         isAntiAlias = true
     }
+    private val paintSnakeBody = Paint().apply { isAntiAlias = true }
     private val paintSnakeHead = Paint().apply {
-        color = Color.rgb(120, 255, 160)
-        isAntiAlias = true
-    }
-    private val paintSnakeBody = Paint().apply {
-        color = Color.rgb(60, 200, 100)
+        color = Color.rgb(140, 255, 170)
         isAntiAlias = true
     }
     private val paintEyeWhite = Paint().apply {
@@ -79,21 +82,28 @@ class GameView(context: Context) : View(context) {
         color = Color.argb(180, 255, 255, 255)
         isAntiAlias = true
     }
+    private val paintScore = Paint().apply {
+        color = Color.WHITE
+        textSize = 50f
+        isAntiAlias = true
+        isFakeBoldText = true
+    }
 
-    // ===== ВРЕМЯ =====
     private var lastFrameTime = 0L
 
     init {
-        // Стартовая позиция змейки — в центре мира
         val startX = worldSize / 2f
         val startY = worldSize / 2f
-        for (i in 0 until startSegments) {
-            segments.add(PointF(startX - i * segmentSpacing, startY))
+
+        // Стартовый трейл — 5 точек влево от старта
+        for (i in 0 until 200) {
+            trail.add(PointF(startX - i * 2f, startY))
         }
-        headAngle = 0f   // смотрим вправо
+
+        headAngle = 0f
 
         // Спавним еду
-        repeat(150) {
+        repeat(200) {
             foods.add(Food(
                 (50..(worldSize.toInt() - 50)).random().toFloat(),
                 (50..(worldSize.toInt() - 50)).random().toFloat()
@@ -103,7 +113,6 @@ class GameView(context: Context) : View(context) {
         lastFrameTime = SystemClock.uptimeMillis()
     }
 
-    // ===== РАЗМЕР ЭКРАНА =====
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         joyRadius = h * 0.18f
@@ -113,11 +122,9 @@ class GameView(context: Context) : View(context) {
         joyKnobY = joyCenterY
     }
 
-    // ===== ИГРОВОЙ ЦИКЛ =====
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        // Ограничиваем FPS ~60
         val now = SystemClock.uptimeMillis()
         val dt = (now - lastFrameTime).coerceAtMost(33L)
         lastFrameTime = now
@@ -125,27 +132,25 @@ class GameView(context: Context) : View(context) {
         update(dt)
         drawWorld(canvas)
 
-        // Перерисовка
         invalidate()
     }
 
     private fun update(dt: Long) {
-        val speed = baseSpeed * (dt / 16.67f)  // нормализация по dt
+        val speed = baseSpeed * (dt / 16.67f)
 
-        // Поворот головы по джойстику (плавно)
+        // Поворот головы по джойстику
         if (joyActive) {
             val targetAngle = atan2(joyVectorY, joyVectorX)
             var diff = targetAngle - headAngle
             while (diff > Math.PI) diff -= (2 * Math.PI).toFloat()
             while (diff < -Math.PI) diff += (2 * Math.PI).toFloat()
 
-            // Плавный поворот (максимум 0.15 радиан за кадр)
-            val turnSpeed = 0.15f * (dt / 16.67f)
+            val turnSpeed = 0.12f * (dt / 16.67f)
             headAngle += diff.coerceIn(-turnSpeed, turnSpeed)
         }
 
-        // Двигаем голову вперёд
-        val head = segments[0]
+        // Двигаем голову
+        val head = trail.last()
         val newHeadX = head.x + cos(headAngle) * speed
         val newHeadY = head.y + sin(headAngle) * speed
 
@@ -153,41 +158,90 @@ class GameView(context: Context) : View(context) {
         val clampedX = newHeadX.coerceIn(segmentRadius, worldSize - segmentRadius)
         val clampedY = newHeadY.coerceIn(segmentRadius, worldSize - segmentRadius)
 
-        // Вставляем новую голову
-        segments.add(0, PointF(clampedX, clampedY))
+        trail.add(PointF(clampedX, clampedY))
 
-        // Убираем хвост (с сохранением нужной длины)
-        while (segments.size > startSegments) {
-            segments.removeAt(segments.size - 1)
+        // Ограничиваем память
+        while (trail.size > maxTrailLength) {
+            trail.removeAt(0)
         }
 
-        // Проверяем съедание еды
-        checkFoodCollision()
+        // Съедание еды
+        checkFoodCollision(clampedX, clampedY)
 
-        // Камера следит за головой
+        // Камера за головой
         camX = clampedX - width / 2f
         camY = clampedY - height / 2f
     }
 
-    private fun checkFoodCollision() {
-        val head = segments[0]
+    private fun checkFoodCollision(hx: Float, hy: Float) {
         val iter = foods.iterator()
         while (iter.hasNext()) {
             val food = iter.next()
-            val dx = food.x - head.x
-            val dy = food.y - head.y
+            val dx = food.x - hx
+            val dy = food.y - hy
             if (sqrt(dx * dx + dy * dy) < segmentRadius + foodRadius) {
                 iter.remove()
-                // TODO: Здесь будет рост и счёт (Шаг 5)
+                score += 1
+
+                // Каждые 10 очков — +1 сегмент
+                if (score % 10 == 0) {
+                    snakeLength += 1
+                }
+
+                // Респавн еды в новом месте
+                foods.add(Food(
+                    (50..(worldSize.toInt() - 50)).random().toFloat(),
+                    (50..(worldSize.toInt() - 50)).random().toFloat()
+                ))
             }
         }
     }
 
+    // Возвращает позиции сегментов змейки (от головы к хвосту)
+    private fun getSnakeSegments(): List<PointF> {
+        val result = mutableListOf<PointF>()
+
+        // Голова — последняя точка трейла
+        result.add(trail.last())
+
+        // Идём по трейлу с конца к началу, набирая точки на нужном расстоянии
+        var needDist = segmentSpacing.toDouble()
+        var i = trail.size - 2
+        var accumulated = 0.0
+
+        while (i > 0 && result.size < snakeLength) {
+            val a = trail[i + 1]
+            val b = trail[i]
+            val dx = (b.x - a.x).toDouble()
+            val dy = (b.y - a.y).toDouble()
+            val d = sqrt(dx * dx + dy * dy)
+
+            if (accumulated + d >= needDist) {
+                // Интерполируем точку на нужном расстоянии
+                val t = (needDist - accumulated) / d
+                val px = (a.x + (b.x - a.x) * t).toFloat()
+                val py = (a.y + (b.y - a.y) * t).toFloat()
+                result.add(PointF(px, py))
+
+                needDist += segmentSpacing
+            } else {
+                accumulated += d
+            }
+            i--
+        }
+
+        // Если трейл короткий — добиваем оставшиеся сегменты в конце
+        while (result.size < snakeLength) {
+            result.add(PointF(trail[0].x, trail[0].y))
+        }
+
+        return result
+    }
+
     private fun drawWorld(canvas: Canvas) {
-        // Фон
         canvas.drawColor(Color.rgb(20, 30, 50))
 
-        // Сетка (для ощущения движения мира)
+        // Сетка
         val gridSize = 100f
         val gridStartX = -(camX % gridSize)
         val gridStartY = -(camY % gridSize)
@@ -202,19 +256,14 @@ class GameView(context: Context) : View(context) {
             y += gridSize
         }
 
-        // Границы мира (красная рамка)
-        val left = -camX
-        val top = -camY
-        val right = worldSize - camX
-        val bottom = worldSize - camY
-        val paintBorder = Paint().apply {
-            color = Color.rgb(255, 80, 80)
-            style = Paint.Style.STROKE
-            strokeWidth = 6f
-        }
-        canvas.drawRect(left, top, right, bottom, paintBorder)
+        // Границы мира
+        canvas.drawRect(
+            -camX, -camY,
+            worldSize - camX, worldSize - camY,
+            paintBorder
+        )
 
-        // Еда
+        // Еда (только то, что видно)
         for (food in foods) {
             val sx = food.x - camX
             val sy = food.y - camY
@@ -223,17 +272,19 @@ class GameView(context: Context) : View(context) {
             }
         }
 
-        // Змейка (рисуем с хвоста к голове)
+        // Змейка
+        val segments = getSnakeSegments()
+
+        // Рисуем с хвоста к голове
         for (i in segments.size - 1 downTo 1) {
             val seg = segments[i]
             val sx = seg.x - camX
             val sy = seg.y - camY
 
-            // Градиент: чем ближе к голове, тем ярче
             val t = 1f - (i.toFloat() / segments.size)
-            val r = (60 + 60 * t).toInt()
-            val g = (180 + 60 * t).toInt()
-            val b = (100 + 40 * t).toInt()
+            val r = (50 + 80 * t).toInt()
+            val g = (160 + 90 * t).toInt()
+            val b = (80 + 60 * t).toInt()
             paintSnakeBody.color = Color.rgb(r, g, b)
 
             canvas.drawCircle(sx, sy, segmentRadius, paintSnakeBody)
@@ -245,9 +296,8 @@ class GameView(context: Context) : View(context) {
         val hy = head.y - camY
         canvas.drawCircle(hx, hy, segmentRadius * 1.15f, paintSnakeHead)
 
-        // Глаза (смотрят по направлению движения)
+        // Глаза
         val eyeDist = segmentRadius * 0.55f
-        val eyeOffsetAngle = 0.6f  // угол между глазами
         val perpX = cos(headAngle + Math.PI.toFloat() / 2)
         val perpY = sin(headAngle + Math.PI.toFloat() / 2)
         val fwdX = cos(headAngle)
@@ -260,8 +310,6 @@ class GameView(context: Context) : View(context) {
 
         canvas.drawCircle(eye1X, eye1Y, segmentRadius * 0.35f, paintEyeWhite)
         canvas.drawCircle(eye2X, eye2Y, segmentRadius * 0.35f, paintEyeWhite)
-
-        // Зрачки (смещены вперёд)
         canvas.drawCircle(
             eye1X + fwdX * segmentRadius * 0.15f,
             eye1Y + fwdY * segmentRadius * 0.15f,
@@ -276,25 +324,25 @@ class GameView(context: Context) : View(context) {
         // Джойстик
         canvas.drawCircle(joyCenterX, joyCenterY, joyRadius, paintJoyBase)
         canvas.drawCircle(joyKnobX, joyKnobY, joyRadius * 0.45f, paintJoyKnob)
+
+        // Счёт
+        canvas.drawText("Score: $score", 40f, 70f, paintScore)
+        canvas.drawText("Length: $snakeLength", 40f, 130f, paintScore)
     }
 
-    // ===== УПРАВЛЕНИЕ =====
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val x = event.x
         val y = event.y
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                // Джойстик активируется, если тап слева от середины экрана
                 if (x < width / 2f) {
                     joyActive = true
                     updateJoy(x, y)
                 }
             }
             MotionEvent.ACTION_MOVE -> {
-                if (joyActive) {
-                    updateJoy(x, y)
-                }
+                if (joyActive) updateJoy(x, y)
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 joyActive = false
@@ -320,14 +368,12 @@ class GameView(context: Context) : View(context) {
             return
         }
 
-        // Ограничиваем ручку радиусом
         val clampedDist = dist.coerceAtMost(joyRadius * 0.7f)
         val nx = dx / dist
         val ny = dy / dist
         joyKnobX = joyCenterX + nx * clampedDist
         joyKnobY = joyCenterY + ny * clampedDist
 
-        // Вектор направления
         joyVectorX = nx
         joyVectorY = ny
     }
