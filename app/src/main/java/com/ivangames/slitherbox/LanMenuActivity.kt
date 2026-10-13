@@ -40,13 +40,10 @@ class LanMenuActivity : AppCompatActivity() {
         btnCreateGame = findViewById(R.id.btnCreateGame)
         btnConnect = findViewById(R.id.btnConnect)
 
-        // Кнопка "Начать игру" — создаём программно, если её нет в layout
-        btnStartGame = Button(this).apply {
-            text = "▶  НАЧАТЬ ИГРУ"
-            textSize = 20f
-            isEnabled = false
-            visibility = View.GONE
-        }
+// Кнопка "Начать игру" — уже в layout
+btnStartGame = findViewById(R.id.btnStartGame)
+btnStartGame.isEnabled = false
+btnStartGame.visibility = View.GONE
 
         // Настраиваем сетевые колбэки
         net.onConnected = {

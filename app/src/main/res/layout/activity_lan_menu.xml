@@ -9,7 +9,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:padding="20dp">
+        android:padding="10dp">
 
         <!-- Заголовок -->
         <TextView
@@ -17,131 +17,145 @@
             android:layout_height="wrap_content"
             android:text="🌐 LAN ИГРА"
             android:textColor="#FFFFFF"
-            android:textSize="36sp"
+            android:textSize="26sp"
             android:textStyle="bold"
             android:shadowColor="#000000"
             android:shadowDx="3"
             android:shadowDy="3"
             android:shadowRadius="6"
-            android:layout_marginBottom="20dp" />
+            android:layout_marginBottom="10dp" />
 
-        <!-- Блок ХОСТА -->
+        <!-- Два блока: ХОСТ слева, КЛИЕНТ справа -->
         <LinearLayout
-            android:layout_width="420dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:orientation="horizontal"
             android:gravity="center"
-            android:background="@drawable/panel_blue"
-            android:padding="16dp"
-            android:layout_marginBottom="12dp">
+            android:layout_marginBottom="10dp">
 
-            <Button
-                android:id="@+id/btnCreateGame"
-                android:layout_width="300dp"
-                android:layout_height="60dp"
-                android:text="🖥  СОЗДАТЬ ИГРУ"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:textColor="#3A2A00"
-                android:background="@drawable/btn_yellow"
-                android:stateListAnimator="@null"
-                android:elevation="0dp" />
-
-            <TextView
-                android:id="@+id/tvHostId"
-                android:layout_width="wrap_content"
+            <!-- === Блок ХОСТА === -->
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="ID: —"
-                android:textColor="#FFFFFF"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:layout_marginTop="10dp" />
-
-            <TextView
-                android:id="@+id/tvHostStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textColor="#B0E0B0"
-                android:textSize="14sp"
-                android:layout_marginTop="4dp" />
-        </LinearLayout>
-
-        <!-- Блок КЛИЕНТА -->
-        <LinearLayout
-            android:layout_width="420dp"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="@drawable/panel_blue"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Подключиться к другу"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
-
-            <EditText
-                android:id="@+id/etHostIp"
-                android:layout_width="300dp"
-                android:layout_height="50dp"
-                android:hint="Например: 192.168.1.42:8888"
-                android:textColorHint="#7080A0"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
                 android:background="@drawable/panel_blue"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:inputType="text"
-                android:maxLines="1"
-                android:layout_marginBottom="10dp" />
+                android:padding="12dp"
+                android:layout_marginEnd="8dp">
 
-            <Button
-                android:id="@+id/btnConnect"
-                android:layout_width="300dp"
-                android:layout_height="60dp"
-                android:text="📱  ПОДКЛЮЧИТЬСЯ"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:textColor="#FFFFFF"
-                android:background="@drawable/btn_blue"
-                android:stateListAnimator="@null"
-                android:elevation="0dp" />
+                <Button
+                    android:id="@+id/btnCreateGame"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="🖥  СОЗДАТЬ"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#3A2A00"
+                    android:background="@drawable/btn_yellow"
+                    android:stateListAnimator="@null"
+                    android:elevation="0dp"
+                    android:padding="0dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp" />
+
+                <TextView
+                    android:id="@+id/tvHostId"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ID: —"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:id="@+id/tvHostStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="#B0E0B0"
+                    android:textSize="12sp"
+                    android:gravity="center"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+
+            <!-- === Блок КЛИЕНТА === -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/panel_blue"
+                android:padding="12dp"
+                android:layout_marginStart="8dp">
+
+                <EditText
+                    android:id="@+id/etHostIp"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:hint="192.168.1.42:8888"
+                    android:textColorHint="#7080A0"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:background="@drawable/panel_blue"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:layout_marginBottom="8dp" />
+
+                <Button
+                    android:id="@+id/btnConnect"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="📱  ПОДКЛЮЧИТЬСЯ"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF"
+                    android:background="@drawable/btn_blue"
+                    android:stateListAnimator="@null"
+                    android:elevation="0dp"
+                    android:padding="0dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp" />
+            </LinearLayout>
         </LinearLayout>
 
-<!-- Кнопка НАЧАТЬ ИГРУ -->
-<Button
-    android:id="@+id/btnStartGame"
-    android:layout_width="300dp"
-    android:layout_height="60dp"
-    android:text="▶  НАЧАТЬ ИГРУ"
-    android:textSize="20sp"
-    android:textStyle="bold"
-    android:textColor="#3A2A00"
-    android:background="@drawable/btn_yellow"
-    android:stateListAnimator="@null"
-    android:elevation="0dp"
-    android:visibility="gone"
-    android:layout_marginBottom="12dp" />
+        <!-- Кнопка НАЧАТЬ ИГРУ (появляется после подключения) -->
+        <Button
+            android:id="@+id/btnStartGame"
+            android:layout_width="300dp"
+            android:layout_height="52dp"
+            android:text="▶  НАЧАТЬ ИГРУ"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#3A2A00"
+            android:background="@drawable/btn_yellow"
+            android:stateListAnimator="@null"
+            android:elevation="0dp"
+            android:padding="0dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp" />
 
-       
- <!-- Кнопка Назад -->
+        <!-- Кнопка Назад -->
         <Button
             android:id="@+id/btnBack"
             android:layout_width="200dp"
-            android:layout_height="50dp"
+            android:layout_height="46dp"
             android:text="⬅  НАЗАД"
-            android:textSize="18sp"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
             android:background="@drawable/btn_red"
             android:stateListAnimator="@null"
-            android:elevation="0dp" />
+            android:elevation="0dp"
+            android:padding="0dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp" />
 
     </LinearLayout>
 
