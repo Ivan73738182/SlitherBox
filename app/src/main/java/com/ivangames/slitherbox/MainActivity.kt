@@ -18,7 +18,10 @@ class MainActivity : AppCompatActivity() {
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
 
-        gameView = GameView(this)
+        // Режим: OFFLINE / HOST / CLIENT
+        val mode = intent.getStringExtra("mode") ?: "OFFLINE"
+
+        gameView = GameView(this, mode)
         setContentView(gameView)
 
         hideSystemUI()
@@ -41,12 +44,8 @@ class MainActivity : AppCompatActivity() {
         if (hasFocus) hideSystemUI()
     }
 
-    /**
-     * Кнопка "Назад" — возвращает в меню (не закрывает приложение).
-     */
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        // Возврат в меню
         startActivity(Intent(this, MenuActivity::class.java))
         finish()
     }

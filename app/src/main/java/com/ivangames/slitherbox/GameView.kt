@@ -14,7 +14,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-class GameView(context: Context) : View(context) {
+class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
 
     // ===== ИГРОВОЙ МИР =====
     private val worldSize = 2000f
