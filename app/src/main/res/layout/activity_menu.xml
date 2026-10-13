@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Фон -->
+    <!-- Фон + ползающая змейка игрока -->
     <com.ivangames.slitherbox.MenuView
         android:id="@+id/menuView"
         android:layout_width="match_parent"
@@ -30,15 +30,23 @@
             android:background="@drawable/btn_icon"
             android:layout_marginEnd="10dp" />
 
-        <!-- 👤 Аватар -->
-        <TextView
+        <!-- 👤 Аватар (кнопка профиля) -->
+        <LinearLayout
+            android:id="@+id/btnProfile"
             android:layout_width="52dp"
             android:layout_height="52dp"
-            android:text="🐍"
-            android:textSize="28sp"
+            android:orientation="horizontal"
             android:gravity="center"
             android:background="@drawable/btn_icon"
-            android:layout_marginEnd="10dp" />
+            android:layout_marginEnd="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🐍"
+                android:textSize="28sp"
+                android:gravity="center" />
+        </LinearLayout>
 
         <!-- Ник -->
         <TextView
@@ -132,7 +140,7 @@
             android:id="@+id/btnSkins"
             android:layout_width="52dp"
             android:layout_height="52dp"
-            android:text="🐍"
+            android:text="🎨"
             android:textSize="26sp"
             android:gravity="center"
             android:background="@drawable/btn_icon" />
@@ -148,8 +156,9 @@
         android:padding="12dp"
         android:layout_gravity="bottom">
 
-        <!-- 🪙 3 монеты -->
+        <!-- 🪙 Ежедневный бонус -->
         <LinearLayout
+            android:id="@+id/btnDailyBonus"
             android:layout_width="wrap_content"
             android:layout_height="60dp"
             android:orientation="horizontal"
@@ -195,25 +204,11 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 🐍 Скины по центру -->
-        <LinearLayout
-            android:id="@+id/btnSnakeSkin"
+        <!-- Пустое место по центру (змейка ползает по фону) -->
+        <View
             android:layout_width="0dp"
-            android:layout_height="60dp"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:background="@drawable/panel_blue"
-            android:layout_marginEnd="10dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="✏️ ОТРЕДАКТИРУЙТЕ ЗМЕЮ"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+            android:layout_height="1dp"
+            android:layout_weight="1" />
 
         <!-- 🏆 Рекорды -->
         <LinearLayout
