@@ -65,11 +65,10 @@ class MenuActivity : AppCompatActivity() {
                 Toast.makeText(this, "⚙️ Настройки скоро!", Toast.LENGTH_SHORT).show()
             }
 
-            // LAN
-            findViewById<TextView>(R.id.btnLan).setOnClickListener {
-                Toast.makeText(this, "🌐 LAN скоро!", Toast.LENGTH_SHORT).show()
-            }
-
+// LAN
+findViewById<TextView>(R.id.btnLan).setOnClickListener {
+    startActivity(Intent(this, LanMenuActivity::class.java))
+}
             // Скины (верхняя иконка)
             findViewById<TextView>(R.id.btnSkins).setOnClickListener {
                 showSkinPicker()
