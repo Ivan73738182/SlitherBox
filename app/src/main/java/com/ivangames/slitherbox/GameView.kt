@@ -132,23 +132,24 @@ class GameView(
     private val paintOverlayBg = Paint().apply { color = Color.argb(180, 0, 0, 0) }
 
     // ===== LAN =====
-    private var remotePlayerX = 0f
-    private var remotePlayerY = 0f
-    private var remotePlayerAngle = 0f
-    private var remotePlayerLen = 5
-    private var remotePlayerScore = 0
-    private var remotePlayerNick = "FRIEND"
-    private var remotePlayerColor = 0xFF64B5F6.toInt()
+    // Удалённый игрок
+    private val remoteTrail = mutableListOf<PointF>()
+    private var remoteHeadAngle = 0f
+    private var remoteLength = 5
+    private var remoteScore = 0
+    private var remoteNick = "FRIEND"
+    private var remoteColor = 0xFF64B5F6.toInt()
     private var hasRemotePlayer = false
 
-    private var lastSendTime = 0L
-    private val sendIntervalMs = 50L
-
+    // Удалённые боты (для клиента)
     private data class RemoteBot(
         val nick: String, val x: Float, val y: Float,
         val angle: Float, val length: Int, val color: Int
     )
     private val remoteBots = mutableListOf<RemoteBot>()
+
+    private var lastSendTime = 0L
+    private val sendIntervalMs = 50L
 
     private var lastFrameTime = 0L
 
@@ -161,7 +162,6 @@ class GameView(
         startNewGame()
         lastFrameTime = SystemClock.uptimeMillis()
 
-        // LAN колбэки
         net?.onMessageReceived = { msg ->
             post { handleNetworkMessage(msg) }
         }
@@ -175,6 +175,7 @@ class GameView(
         foods.clear()
         bots.clear()
         remoteBots.clear()
+        remoteTrail.clear()
         hasRemotePlayer = false
 
         val startX = worldSize / 2f
@@ -196,7 +197,6 @@ class GameView(
 
         repeat(600) { foods.add(spawnFood()) }
 
-        // Только ХОСТ или OFFLINE спавнит ботов
         if (mode == "HOST" || mode == "OFFLINE") {
             val margin = 500f
             for (i in 0 until 30) {
@@ -297,7 +297,7 @@ class GameView(
             }
         }
 
-        // Столкновения — только для HOST / OFFLINE
+        // Столкновения с ботами — HOST / OFFLINE
         if (mode != "CLIENT") {
             for (bot in bots) {
                 if (!bot.alive) continue
@@ -321,15 +321,42 @@ class GameView(
             }
         }
 
+        // Столкновение с удалённым игроком
+        if (hasRemotePlayer && remoteTrail.size > 1) {
+            // Проверяем все сегменты удалённого игрока
+            val remoteSegments = getTrailSegments(remoteTrail, remoteLength, remoteHeadAngle)
+            for (i in 1 until remoteSegments.size) {
+                val seg = remoteSegments[i]
+                val dx = newHeadX - seg.x
+                val dy = newHeadY - seg.y
+                if (dx * dx + dy * dy < (segmentRadius * 1.4f) * (segmentRadius * 1.4f)) {
+                    gameOver(); return
+                }
+            }
+            // Голова об голову
+            if (remoteSegments.isNotEmpty()) {
+                val rHead = remoteSegments[0]
+                val dx = newHeadX - rHead.x
+                val dy = newHeadY - rHead.y
+                if (dx * dx + dy * dy < (segmentRadius * 1.4f) * (segmentRadius * 1.4f)) {
+                    gameOver(); return
+                }
+            }
+        }
+
         checkFoodCollision(newHeadX, newHeadY)
 
-        // Боты — только HOST / OFFLINE
+        // Боты — HOST / OFFLINE
         if (mode != "CLIENT") {
             val foodPositions = foods.map { PointF(it.x, it.y) }
             for (bot in bots) {
                 if (!bot.alive) continue
                 val enemies = mutableListOf<PointF>()
                 enemies.addAll(getSnakeSegments())
+                // Добавляем удалённого игрока
+                if (hasRemotePlayer && remoteTrail.size > 1) {
+                    enemies.addAll(getTrailSegments(remoteTrail, remoteLength, remoteHeadAngle))
+                }
                 for (other in bots) {
                     if (other !== bot && other.alive) {
                         enemies.addAll(other.getSegments())
@@ -353,12 +380,12 @@ class GameView(
 
             val deadBots = bots.filter { !it.alive }
             for (bot in deadBots) {
-                val head2 = bot.trail.lastOrNull() ?: continue
+                val h2 = bot.trail.lastOrNull() ?: continue
                 val dropCount = (bot.length / 3).coerceAtLeast(2)
                 for (i in 0 until dropCount) {
                     foods.add(Food(
-                        head2.x + (Math.random().toFloat() - 0.5f) * 100f,
-                        head2.y + (Math.random().toFloat() - 0.5f) * 100f,
+                        h2.x + (Math.random().toFloat() - 0.5f) * 100f,
+                        h2.y + (Math.random().toFloat() - 0.5f) * 100f,
                         Color.rgb(255, 200, 60),
                         true
                     ))
@@ -370,7 +397,7 @@ class GameView(
         camX = newHeadX - width / 2f
         camY = newHeadY - height / 2f
 
-        // ===== LAN =====
+        // LAN
         val now = SystemClock.uptimeMillis()
         if (now - lastSendTime >= sendIntervalMs) {
             lastSendTime = now
@@ -388,7 +415,6 @@ class GameView(
     }
 
     private fun checkFoodCollision(hx: Float, hy: Float) {
-        // Клиент не ест — это делает хост
         if (mode == "CLIENT") return
 
         val newFoods = mutableListOf<Food>()
@@ -411,17 +437,24 @@ class GameView(
     }
 
     private fun getSnakeSegments(): List<PointF> {
+        return getTrailSegments(trail, snakeLength, headAngle)
+    }
+
+    /**
+     * Универсальная функция — получить сегменты из трейла.
+     */
+    private fun getTrailSegments(trailRef: List<PointF>, count: Int, angle: Float): List<PointF> {
         val result = mutableListOf<PointF>()
-        if (trail.isEmpty()) return result
-        result.add(trail.last())
+        if (trailRef.isEmpty()) return result
+        result.add(trailRef.last())
 
         var needDist = segmentSpacing.toDouble()
-        var i = trail.size - 2
+        var i = trailRef.size - 2
         var accumulated = 0.0
 
-        while (i > 0 && result.size < snakeLength) {
-            val a = trail[i + 1]
-            val b = trail[i]
+        while (i > 0 && result.size < count) {
+            val a = trailRef[i + 1]
+            val b = trailRef[i]
             val dx = (b.x - a.x).toDouble()
             val dy = (b.y - a.y).toDouble()
             val d = sqrt(dx * dx + dy * dy)
@@ -438,13 +471,13 @@ class GameView(
             i--
         }
 
-        while (result.size < snakeLength) {
-            result.add(PointF(trail[0].x, trail[0].y))
+        while (result.size < count) {
+            result.add(PointF(trailRef[0].x, trailRef[0].y))
         }
         return result
     }
 
-    // ===== ПРОДОЛЖЕНИЕ — ШАГ 3 =====
+    // ===== ПРОДОЛЖЕНИЕ — ЧАСТЬ B =====
 }
     private fun drawWorld(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 30, 50))
@@ -467,7 +500,7 @@ class GameView(
         // Границы
         canvas.drawRect(-camX, -camY, worldSize - camX, worldSize - camY, paintBorder)
 
-        // Еда (culling)
+        // Еда
         for (food in foods) {
             val sx = food.x - camX
             val sy = food.y - camY
@@ -482,22 +515,22 @@ class GameView(
             }
         }
 
-        // Боты — HOST/OFFLINE
+        // Боты — HOST / OFFLINE
         if (mode != "CLIENT") {
             for (bot in bots) {
                 bot.draw(canvas, camX, camY, paintSnakeBody, paintSnakeHead)
             }
         }
 
-        // Боты — CLIENT (удалённые)
+        // Боты — CLIENT
         if (mode == "CLIENT") {
             drawRemoteBots(canvas)
         }
 
-        // Удалённый игрок
-        drawRemotePlayer(canvas)
+        // Удалённый игрок — полное тело
+        drawRemotePlayerFull(canvas)
 
-        // Игрок
+        // Свой игрок
         if (!isGameOver) {
             val segments = getSnakeSegments()
             val baseR = (skinColor shr 16) and 0xFF
@@ -573,25 +606,59 @@ class GameView(
         }
     }
 
+    private fun drawRemotePlayerFull(canvas: Canvas) {
+        if (!hasRemotePlayer) return
+        if (remoteTrail.isEmpty()) return
+
+        val segs = getTrailSegments(remoteTrail, remoteLength, remoteHeadAngle)
+        if (segs.isEmpty()) return
+
+        val baseR = (remoteColor shr 16) and 0xFF
+        val baseG = (remoteColor shr 8) and 0xFF
+        val baseB = remoteColor and 0xFF
+
+        for (i in segs.size - 1 downTo 1) {
+            val seg = segs[i]
+            val sx = seg.x - camX
+            val sy = seg.y - camY
+            if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) continue
+
+            val t = 1f - (i.toFloat() / segs.size)
+            val factor = 0.55f + 0.45f * t
+            val r = (baseR * factor).toInt().coerceIn(0, 255)
+            val g = (baseG * factor).toInt().coerceIn(0, 255)
+            val b = (baseB * factor).toInt().coerceIn(0, 255)
+            paintSnakeBody.color = Color.rgb(r, g, b)
+            canvas.drawCircle(sx, sy, segmentRadius, paintSnakeBody)
+        }
+
+        val head = segs[0]
+        val hx = head.x - camX
+        val hy = head.y - camY
+
+        paintSnakeHead.color = remoteColor
+        canvas.drawCircle(hx, hy, segmentRadius * 1.15f, paintSnakeHead)
+
+        // Ник
+        canvas.drawText(remoteNick, hx, hy - segmentRadius * 2f, paintNick)
+    }
+
     private fun drawLeaderboard(canvas: Canvas) {
         val entries = mutableListOf<Pair<String, Int>>()
         entries.add(playerNick to score)
 
         if (mode == "CLIENT") {
-            // У клиента — только свой счёт + удалённые боты (у них нет счёта — просто длина)
             for (bot in remoteBots) {
                 entries.add(bot.nick to bot.length)
             }
         } else {
-            // У хоста — свои боты
             for (bot in bots) {
                 if (bot.alive) entries.add(bot.nick to bot.score)
             }
         }
 
-        // Удалённый игрок
         if (hasRemotePlayer) {
-            entries.add(remotePlayerNick to remotePlayerScore)
+            entries.add(remoteNick to remoteScore)
         }
 
         entries.sortByDescending { it.second }
@@ -632,16 +699,27 @@ class GameView(
         }
     }
 
-    // ===== LAN: обработка сообщений =====
+    // ===== LAN =====
     private fun handleNetworkMessage(msg: String) {
         if (msg.startsWith("CLIENT|")) {
+            // Хост получает змейку клиента — полный трейл
             val p = msg.split("|")
             if (p.size >= 6) {
-                remotePlayerX = p[1].toFloatOrNull() ?: 0f
-                remotePlayerY = p[2].toFloatOrNull() ?: 0f
-                remotePlayerAngle = p[3].toFloatOrNull() ?: 0f
-                remotePlayerLen = p[4].toIntOrNull() ?: 5
-                remotePlayerScore = p[5].toIntOrNull() ?: 0
+                val cx2 = p[1].toFloatOrNull() ?: 0f
+                val cy2 = p[2].toFloatOrNull() ?: 0f
+                val ca = p[3].toFloatOrNull() ?: 0f
+                val cl = p[4].toIntOrNull() ?: 5
+                val cs = p[5].toIntOrNull() ?: 0
+
+                // Добавляем в удалённый трейл
+                remoteTrail.add(PointF(cx2, cy2))
+                while (remoteTrail.size > 8000) remoteTrail.removeAt(0)
+
+                remoteHeadAngle = ca
+                remoteLength = cl
+                remoteScore = cs
+                remoteNick = "FRIEND"
+                remoteColor = 0xFF64B5F6.toInt()
                 hasRemotePlayer = true
             }
         } else if (msg.startsWith("STATE|")) {
@@ -653,18 +731,28 @@ class GameView(
         val p = msg.split("|")
         if (p.size < 9) return
 
-        remotePlayerX = p[1].toFloatOrNull() ?: 0f
-        remotePlayerY = p[2].toFloatOrNull() ?: 0f
-        remotePlayerAngle = p[3].toFloatOrNull() ?: 0f
-        remotePlayerLen = p[4].toIntOrNull() ?: 5
-        remotePlayerScore = p[5].toIntOrNull() ?: 0
+        val hx = p[1].toFloatOrNull() ?: 0f
+        val hy = p[2].toFloatOrNull() ?: 0f
+        val ha = p[3].toFloatOrNull() ?: 0f
+        val hl = p[4].toIntOrNull() ?: 5
+        val hs = p[5].toIntOrNull() ?: 0
+
+        // Хост-трейл
+        remoteTrail.add(PointF(hx, hy))
+        while (remoteTrail.size > 8000) remoteTrail.removeAt(0)
+
+        remoteHeadAngle = ha
+        remoteLength = hl
+        remoteScore = hs
+        remoteNick = "HOST"
+        remoteColor = 0xFF80DC78.toInt()  // зелёный
+        hasRemotePlayer = true
 
         val foodCount = p[6].toIntOrNull() ?: 0
         val botCount = p[7].toIntOrNull() ?: 0
 
         var idx = 8
 
-        // Еда
         foods.clear()
         for (i in 0 until foodCount) {
             if (idx >= p.size) break
@@ -678,7 +766,6 @@ class GameView(
             idx++
         }
 
-        // Боты
         remoteBots.clear()
         for (i in 0 until botCount) {
             if (idx >= p.size) break
@@ -694,8 +781,6 @@ class GameView(
             }
             idx++
         }
-
-        hasRemotePlayer = true
     }
 
     private fun sendHostState() {
@@ -711,11 +796,13 @@ class GameView(
         sb.append(snakeLength).append("|")
         sb.append(score).append("|")
 
-        // Еда — шлём все (для клиента — он не ест, значит не растёт)
-        sb.append(foods.size).append("|")
+        // Ограничим еду — 150 штук (иначе сообщение огромное)
+        val foodLimit = 150
+        val foodToSend = if (foods.size > foodLimit) foods.take(foodLimit) else foods
+        sb.append(foodToSend.size).append("|")
         sb.append(bots.size).append("|")
 
-        for (food in foods) {
+        for (food in foodToSend) {
             sb.append(food.x).append(",").append(food.y).append(",").append(food.color).append("|")
         }
 
@@ -748,21 +835,6 @@ class GameView(
         sb.append(score)
 
         n.send(sb.toString())
-    }
-
-    // ===== LAN: отрисовка =====
-    private fun drawRemotePlayer(canvas: Canvas) {
-        if (!hasRemotePlayer) return
-        val sx = remotePlayerX - camX
-        val sy = remotePlayerY - camY
-        if (sx < -100 || sx > width + 100 || sy < -100 || sy > height + 100) return
-
-        val paint = Paint().apply {
-            color = remotePlayerColor
-            isAntiAlias = true
-        }
-        canvas.drawCircle(sx, sy, segmentRadius * 1.2f, paint)
-        canvas.drawText(remotePlayerNick, sx, sy - segmentRadius * 2.5f, paintNick)
     }
 
     private fun drawRemoteBots(canvas: Canvas) {
