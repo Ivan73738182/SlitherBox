@@ -144,10 +144,7 @@ class GameView(
 
     private var lastFrameTime = 0L
 
-    // Главный Handler для UI-операций
     private val mainHandler = Handler(Looper.getMainLooper())
-
-    // Счётчик для диагностики
     private var diagnosticCounter = 0
 
     init {
@@ -170,7 +167,6 @@ class GameView(
         net?.onMessageReceived = { msg ->
             Log.d("SlitherBox", "RECV: ${msg.take(100)}")
 
-            // Диагностика — показываем каждое 20-е сообщение
             diagnosticCounter++
             if (diagnosticCounter % 20 == 1) {
                 mainHandler.post {
@@ -178,9 +174,7 @@ class GameView(
                 }
             }
 
-            mainHandler.post {
-                handleNetworkMessage(msg)
-            }
+            mainHandler.post { handleNetworkMessage(msg) }
         }
         net?.onDisconnected = {
             Log.d("SlitherBox", "DISCONNECTED")
@@ -224,7 +218,6 @@ class GameView(
 
         repeat(600) { foods.add(spawnFood()) }
 
-        // Боты — только HOST / OFFLINE
         if (mode == "HOST" || mode == "OFFLINE") {
             val margin = 500f
             for (i in 0 until 30) {
@@ -366,6 +359,7 @@ private fun update(dt: Long) {
         }
     }
 
+    // ЕДА — работает и у клиента, и у хоста, и в оффлайне
     checkFoodCollision(newHeadX, newHeadY)
 
     if (mode != "CLIENT") {
@@ -419,11 +413,8 @@ private fun update(dt: Long) {
     val now = SystemClock.uptimeMillis()
     if (now - lastSendTime >= sendIntervalMs) {
         lastSendTime = now
-        if (mode == "HOST") {
-            sendHostState()
-        } else if (mode == "CLIENT") {
-            sendClientState()
-        }
+        if (mode == "HOST") sendHostState()
+        else if (mode == "CLIENT") sendClientState()
     }
 }
 
@@ -436,7 +427,6 @@ private fun gameOver() {
 }
 
 private fun checkFoodCollision(hx: Float, hy: Float) {
-    if (mode == "CLIENT") return
     val newFoods = mutableListOf<Food>()
     val iter = foods.iterator()
     while (iter.hasNext()) {
@@ -448,7 +438,14 @@ private fun checkFoodCollision(hx: Float, hy: Float) {
             val points = if (food.big) 10 else 1
             score += points
             while (score >= snakeLength * 10) snakeLength += 1
-            newFoods.add(spawnFood())
+
+            if (mode == "CLIENT") {
+                // Клиент сообщает хосту, что съел
+                net?.send("EAT|${food.x}|${food.y}")
+            } else {
+                // Хост / оффлайн — респавн
+                newFoods.add(spawnFood())
+            }
         }
     }
     foods.addAll(newFoods)
@@ -673,6 +670,24 @@ private fun handleNetworkMessage(msg: String) {
         }
     } else if (msg.startsWith("STATE|")) {
         parseStateMessage(msg)
+    } else if (msg.startsWith("EAT|")) {
+        // Хост: клиент съел еду в точке
+        val p = msg.split("|")
+        if (p.size >= 3) {
+            val ex = p[1].toFloatOrNull() ?: return
+            val ey = p[2].toFloatOrNull() ?: return
+            val iter = foods.iterator()
+            while (iter.hasNext()) {
+                val food = iter.next()
+                val dx = food.x - ex
+                val dy = food.y - ey
+                if (dx * dx + dy * dy < 400f) {
+                    iter.remove()
+                    foods.add(spawnFood())
+                    break
+                }
+            }
+        }
     }
 }
 
