@@ -16,6 +16,7 @@ class BotSnake(
     private val bodyColor: Int,
     private val headColor: Int,
     private val worldSize: Float,
+    var nick: String = "Bot",
     private val segmentRadius: Float = 12f,
     private val segmentSpacing: Float = 14f,
     private val speed: Float = 3.8f
@@ -39,11 +40,6 @@ class BotSnake(
         }
     }
 
-    /**
-     * Обновление бота.
-     * @param enemies список чужих сегментов (все сегменты других змей + игрока)
-     *                 — для избегания. Формат: список точек.
-     */
     fun update(dt: Long, foods: List<PointF>, enemySegments: List<PointF>) {
         if (!alive) return
 
@@ -52,7 +48,7 @@ class BotSnake(
 
         val head = trail.last()
 
-        // ===== ПРОВЕРКА СМЕРТИ ОТ СТЕН =====
+        // Стены
         val wallMargin = segmentRadius
         if (head.x < wallMargin || head.x > worldSize - wallMargin ||
             head.y < wallMargin || head.y > worldSize - wallMargin
@@ -61,20 +57,18 @@ class BotSnake(
             return
         }
 
-        // ===== ПРОВЕРКА СТОЛКНОВЕНИЯ С ЧУЖИМИ СЕГМЕНТАМИ =====
-        val dangerRadius = segmentRadius * 2.5f  // радиус обнаружения опасности
+        // Столкновение с чужими сегментами
         for (seg in enemySegments) {
             val dx = seg.x - head.x
             val dy = seg.y - head.y
             if (dx * dx + dy * dy < (segmentRadius * 1.5f) * (segmentRadius * 1.5f)) {
-                // Касание = смерть
                 alive = false
                 return
             }
         }
 
-        // ===== AI =====
-        // Ищем ближайшую опасность (сегмент врага) в радиусе
+        // AI
+        val dangerRadius = segmentRadius * 3f
         var dangerSegment: PointF? = null
         var dangerDist = Float.MAX_VALUE
         for (seg in enemySegments) {
@@ -87,7 +81,6 @@ class BotSnake(
             }
         }
 
-        // Стена рядом?
         val nearWallDist = 150f
         val nearWall = head.x < nearWallDist || head.x > worldSize - nearWallDist ||
                 head.y < nearWallDist || head.y > worldSize - nearWallDist
@@ -95,19 +88,16 @@ class BotSnake(
         var targetAngle = headAngle
 
         when {
-            // 1. Опасность — уходим
             dangerSegment != null -> {
                 val dx = head.x - dangerSegment.x
                 val dy = head.y - dangerSegment.y
                 targetAngle = atan2(dy, dx)
             }
-            // 2. Стена близко — к центру
             nearWall -> {
                 val toCenterX = worldSize / 2f - head.x
                 val toCenterY = worldSize / 2f - head.y
                 targetAngle = atan2(toCenterY, toCenterX)
             }
-            // 3. Еда — идём
             else -> {
                 retargetCooldown -= dt
                 if (retargetCooldown <= 0f || targetFood == null) {
@@ -122,7 +112,6 @@ class BotSnake(
             }
         }
 
-        // Плавный поворот
         var diff = targetAngle - headAngle
         while (diff > Math.PI) diff -= (2 * Math.PI).toFloat()
         while (diff < -Math.PI) diff += (2 * Math.PI).toFloat()
@@ -130,13 +119,12 @@ class BotSnake(
         val turnSpeed = 0.09f * (dt / 16.67f)
         headAngle += diff.coerceIn(-turnSpeed, turnSpeed)
 
-        // Двигаем
         val newHeadX = head.x + cos(headAngle) * speedThisFrame
         val newHeadY = head.y + sin(headAngle) * speedThisFrame
 
         trail.add(PointF(newHeadX, newHeadY))
 
-        while (trail.size > 2000) {
+        while (trail.size > 1500) {
             trail.removeAt(0)
         }
     }
@@ -159,7 +147,6 @@ class BotSnake(
     fun getSegments(): List<PointF> {
         val result = mutableListOf<PointF>()
         if (trail.isEmpty()) return result
-
         result.add(trail.last())
 
         var needDist = segmentSpacing.toDouble()
@@ -188,17 +175,11 @@ class BotSnake(
         while (result.size < length) {
             result.add(PointF(trail[0].x, trail[0].y))
         }
-
         return result
     }
 
-    /**
-     * Ищет лучшую еду: не ближайшую, а случайную из топ-15.
-     * Так боты не собираются в одну точку.
-     */
     private fun findBestFood(foods: List<PointF>, head: PointF): PointF? {
         if (foods.isEmpty()) return null
-
         val candidates = mutableListOf<Pair<PointF, Float>>()
         for (f in foods) {
             val dx = f.x - head.x
@@ -222,6 +203,7 @@ class BotSnake(
             val seg = segments[i]
             val sx = seg.x - camX
             val sy = seg.y - camY
+            // Culling — не рисуем за экраном
             if (sx < -50 || sx > canvas.width + 50 || sy < -50 || sy > canvas.height + 50) continue
             canvas.drawCircle(sx, sy, segmentRadius, bodyPaint)
         }
@@ -233,14 +215,8 @@ class BotSnake(
         headPaint.color = headColor
         canvas.drawCircle(hx, hy, segmentRadius * 1.15f, headPaint)
 
-        val whitePaint = Paint().apply {
-            color = Color.WHITE
-            isAntiAlias = true
-        }
-        val blackPaint = Paint().apply {
-            color = Color.BLACK
-            isAntiAlias = true
-        }
+        val whitePaint = Paint().apply { color = Color.WHITE; isAntiAlias = true }
+        val blackPaint = Paint().apply { color = Color.BLACK; isAntiAlias = true }
 
         val eyeDist = segmentRadius * 0.55f
         val perpX = cos(headAngle + Math.PI.toFloat() / 2)
@@ -255,15 +231,18 @@ class BotSnake(
 
         canvas.drawCircle(eye1X, eye1Y, segmentRadius * 0.35f, whitePaint)
         canvas.drawCircle(eye2X, eye2Y, segmentRadius * 0.35f, whitePaint)
-        canvas.drawCircle(
-            eye1X + fwdX * segmentRadius * 0.15f,
-            eye1Y + fwdY * segmentRadius * 0.15f,
-            segmentRadius * 0.18f, blackPaint
-        )
-        canvas.drawCircle(
-            eye2X + fwdX * segmentRadius * 0.15f,
-            eye2Y + fwdY * segmentRadius * 0.15f,
-            segmentRadius * 0.18f, blackPaint
-        )
+        canvas.drawCircle(eye1X + fwdX * 3f, eye1Y + fwdY * 3f, segmentRadius * 0.18f, blackPaint)
+        canvas.drawCircle(eye2X + fwdX * 3f, eye2Y + fwdY * 3f, segmentRadius * 0.18f, blackPaint)
+
+        // Ник над головой
+        val nickPaint = Paint().apply {
+            color = Color.WHITE
+            textSize = 24f
+            isAntiAlias = true
+            isFakeBoldText = true
+            textAlign = Paint.Align.CENTER
+            setShadowLayer(4f, 0f, 0f, Color.BLACK)
+        }
+        canvas.drawText(nick, hx, hy - segmentRadius * 2f, nickPaint)
     }
 }

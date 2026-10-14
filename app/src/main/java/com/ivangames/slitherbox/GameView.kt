@@ -14,52 +14,72 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
+class GameView(
+    context: Context,
+    val mode: String = "OFFLINE",
+    val net: NetworkManager? = null
+) : View(context) {
 
-    // ===== ИГРОВОЙ МИР =====
-    private val worldSize = 2000f
+    // ===== МИР =====
+    private val worldSize = 5000f
     private val foodRadius = 8f
     private val segmentRadius = 12f
     private val segmentSpacing = 14f
     private var snakeLength = 5
     private var score = 0
 
-    // ===== ЗМЕЙКА (трейл) =====
+    // ===== ТРЕЙЛ =====
     private val trail = mutableListOf<PointF>()
-    private val maxTrailLength = 5000
+    private val maxTrailLength = 8000
     private var headAngle = 0f
     private val baseSpeed = 4.5f
 
-    // ===== СОСТОЯНИЕ ИГРЫ =====
+    // ===== УСКОРЕНИЕ =====
+    private var boosting = false
+    private var boostButtonX = 0f
+    private var boostButtonY = 0f
+    private var boostButtonR = 0f
+    private var boostCooldown = 0f
+    private val boostSpeedMul = 2.2f
+
+    // ===== СОСТОЯНИЕ =====
     private var isGameOver = false
 
-    // ===== РЕКОРД + СКИН =====
+    // ===== РЕКОРД / СКИН / НИК =====
     private lateinit var prefs: SharedPreferences
     private var bestScore = 0
     private var skinColor: Int = 0xFF80DC78.toInt()
+    private var playerNick: String = "IVAN"
 
     // ===== КАМЕРА =====
     private var camX = 0f
     private var camY = 0f
 
     // ===== ЕДА =====
-    private data class Food(val x: Float, val y: Float, val color: Int)
+    private data class Food(val x: Float, val y: Float, val color: Int, val big: Boolean = false)
     private val foods = mutableListOf<Food>()
-
-    // ===== ПАЛИТРА ЕДЫ =====
     private val foodColors = intArrayOf(
-        Color.rgb(80, 220, 120),
-        Color.rgb(255, 100, 100),
-        Color.rgb(255, 220, 100),
-        Color.rgb(100, 180, 255),
-        Color.rgb(200, 120, 255),
-        Color.rgb(255, 160, 80),
-        Color.rgb(255, 120, 200),
-        Color.rgb(120, 255, 240)
+        Color.rgb(80, 220, 120), Color.rgb(255, 100, 100),
+        Color.rgb(255, 220, 100), Color.rgb(100, 180, 255),
+        Color.rgb(200, 120, 255), Color.rgb(255, 160, 80),
+        Color.rgb(255, 120, 200), Color.rgb(120, 255, 240)
     )
 
     // ===== БОТЫ =====
     private val bots = mutableListOf<BotSnake>()
+    private val botNames = arrayOf(
+        "Carolyn","Wendy","Tracey","Felicity","Andrea","mass thief",
+        "eatmyfat","DNADNB","u8violin","Skilled","Ninja","Viper",
+        "Cobra","Python","Anaconda","Mamba","Boa","Adder","Racer",
+        "Garter","King","Grass","Tree","Sea","Corn","Milk",
+        "Rat","Fox","Wolf","Lion","Tiger","Bear","Eagle"
+    )
+    private val botColors = intArrayOf(
+        Color.rgb(255,100,100), Color.rgb(255,220,100), Color.rgb(180,120,255),
+        Color.rgb(255,160,80), Color.rgb(100,200,255), Color.rgb(255,130,180),
+        Color.rgb(120,255,200), Color.rgb(200,200,100), Color.rgb(180,255,120),
+        Color.rgb(255,180,180)
+    )
 
     // ===== ДЖОЙСТИК =====
     private var joyCenterX = 0f
@@ -72,66 +92,44 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
     private var joyVectorY = 0f
 
     // ===== КРАСКИ =====
-    private val paintGrid = Paint().apply {
-        color = Color.rgb(30, 45, 70)
-        strokeWidth = 1f
-    }
+    private val paintGrid = Paint().apply { color = Color.rgb(30, 45, 70); strokeWidth = 1f }
     private val paintBorder = Paint().apply {
         color = Color.rgb(255, 80, 80)
         style = Paint.Style.STROKE
-        strokeWidth = 6f
+        strokeWidth = 8f
     }
     private val paintFood = Paint().apply { isAntiAlias = true }
+    private val paintBigFood = Paint().apply { isAntiAlias = true }
     private val paintSnakeBody = Paint().apply { isAntiAlias = true }
     private val paintSnakeHead = Paint().apply { isAntiAlias = true }
-    private val paintEyeWhite = Paint().apply {
-        color = Color.WHITE
-        isAntiAlias = true
-    }
-    private val paintEyeBlack = Paint().apply {
-        color = Color.BLACK
-        isAntiAlias = true
-    }
-    private val paintJoyBase = Paint().apply {
-        color = Color.argb(80, 255, 255, 255)
-        isAntiAlias = true
-    }
-    private val paintJoyKnob = Paint().apply {
-        color = Color.argb(180, 255, 255, 255)
-        isAntiAlias = true
-    }
+    private val paintEyeWhite = Paint().apply { color = Color.WHITE; isAntiAlias = true }
+    private val paintEyeBlack = Paint().apply { color = Color.BLACK; isAntiAlias = true }
+    private val paintJoyBase = Paint().apply { color = Color.argb(80, 255, 255, 255); isAntiAlias = true }
+    private val paintJoyKnob = Paint().apply { color = Color.argb(180, 255, 255, 255); isAntiAlias = true }
+    private val paintBoostBase = Paint().apply { color = Color.argb(80, 255, 220, 100); isAntiAlias = true }
     private val paintScore = Paint().apply {
-        color = Color.WHITE
-        textSize = 50f
-        isAntiAlias = true
-        isFakeBoldText = true
+        color = Color.WHITE; textSize = 42f; isAntiAlias = true; isFakeBoldText = true
     }
-    private val paintBotBody = Paint().apply { isAntiAlias = true }
-    private val paintBotHead = Paint().apply { isAntiAlias = true }
-
-    // Game Over
-    private val paintGameOverTitle = Paint().apply {
-        color = Color.WHITE
-        textSize = 110f
-        isAntiAlias = true
-        isFakeBoldText = true
+    private val paintNick = Paint().apply {
+        color = Color.WHITE; textSize = 26f; isAntiAlias = true; isFakeBoldText = true
         textAlign = Paint.Align.CENTER
+    }
+    private val paintLeader = Paint().apply {
+        color = Color.WHITE; textSize = 24f; isAntiAlias = true
+    }
+    private val paintLeaderBg = Paint().apply { color = Color.argb(150, 0, 0, 0) }
+    private val paintLeaderHighlight = Paint().apply { color = Color.argb(120, 255, 220, 100) }
+    private val paintGameOverTitle = Paint().apply {
+        color = Color.WHITE; textSize = 100f; isAntiAlias = true
+        isFakeBoldText = true; textAlign = Paint.Align.CENTER
     }
     private val paintGameOverText = Paint().apply {
-        color = Color.WHITE
-        textSize = 55f
-        isAntiAlias = true
-        textAlign = Paint.Align.CENTER
+        color = Color.WHITE; textSize = 50f; isAntiAlias = true; textAlign = Paint.Align.CENTER
     }
     private val paintGameOverHint = Paint().apply {
-        color = Color.rgb(200, 200, 200)
-        textSize = 45f
-        isAntiAlias = true
-        textAlign = Paint.Align.CENTER
+        color = Color.rgb(200, 200, 200); textSize = 40f; isAntiAlias = true; textAlign = Paint.Align.CENTER
     }
-    private val paintOverlayBg = Paint().apply {
-        color = Color.argb(180, 0, 0, 0)
-    }
+    private val paintOverlayBg = Paint().apply { color = Color.argb(180, 0, 0, 0) }
 
     private var lastFrameTime = 0L
 
@@ -139,9 +137,9 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
         prefs = context.getSharedPreferences("slitherbox", Context.MODE_PRIVATE)
         bestScore = prefs.getInt("best_score", 0)
         skinColor = prefs.getInt("skin_color", 0xFF80DC78.toInt())
+        playerNick = prefs.getString("player_nick", "IVAN") ?: "IVAN"
 
         startNewGame()
-
         lastFrameTime = SystemClock.uptimeMillis()
     }
 
@@ -161,44 +159,42 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
         snakeLength = 5
         score = 0
         isGameOver = false
+        boosting = false
+        boostCooldown = 0f
 
-        // Обновляем скин (мог поменяться в меню)
         skinColor = prefs.getInt("skin_color", 0xFF80DC78.toInt())
+        playerNick = prefs.getString("player_nick", "IVAN") ?: "IVAN"
 
-        repeat(200) {
-            foods.add(spawnFood())
-        }
+        repeat(600) { foods.add(spawnFood()) }
 
-        val botColors = listOf(
-            Color.rgb(255, 100, 100) to Color.rgb(255, 150, 150),
-            Color.rgb(255, 220, 100) to Color.rgb(255, 240, 160),
-            Color.rgb(180, 120, 255) to Color.rgb(210, 170, 255),
-            Color.rgb(255, 160, 80)  to Color.rgb(255, 200, 130),
-            Color.rgb(100, 200, 255) to Color.rgb(160, 230, 255)
-        )
-
-        val margin = 300f
-        for (colors in botColors) {
+        val margin = 500f
+        for (i in 0 until 30) {
             val bx = margin + Math.random().toFloat() * (worldSize - 2 * margin)
             val by = margin + Math.random().toFloat() * (worldSize - 2 * margin)
             val ba = (Math.random() * 2 * Math.PI).toFloat()
-            bots.add(BotSnake(bx, by, ba, colors.first, colors.second, worldSize))
+            val color = botColors[i % botColors.size]
+            val headColor = lighten(color, 0.3f)
+            val nick = botNames[i % botNames.size]
+            bots.add(BotSnake(bx, by, ba, color, headColor, worldSize, nick))
         }
-
-        joyKnobX = joyCenterX
-        joyKnobY = joyCenterY
-        joyVectorX = 0f
-        joyVectorY = 0f
-        joyActive = false
     }
 
-    private fun randomFoodColor(): Int = foodColors.random()
+    private fun lighten(color: Int, amount: Float): Int {
+        val r = (color shr 16) and 0xFF
+        val g = (color shr 8) and 0xFF
+        val b = color and 0xFF
+        val nr = (r + (255 - r) * amount).toInt().coerceIn(0, 255)
+        val ng = (g + (255 - g) * amount).toInt().coerceIn(0, 255)
+        val nb = (b + (255 - b) * amount).toInt().coerceIn(0, 255)
+        return Color.rgb(nr, ng, nb)
+    }
 
-    private fun spawnFood(): Food {
+    private fun spawnFood(big: Boolean = false): Food {
         return Food(
             (50..(worldSize.toInt() - 50)).random().toFloat(),
             (50..(worldSize.toInt() - 50)).random().toFloat(),
-            randomFoodColor()
+            if (big) Color.rgb(255, 200, 60) else foodColors.random(),
+            big
         )
     }
 
@@ -209,6 +205,10 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
         joyCenterY = h - joyRadius - h * 0.05f
         joyKnobX = joyCenterX
         joyKnobY = joyCenterY
+
+        boostButtonR = h * 0.12f
+        boostButtonX = w - boostButtonR - h * 0.05f
+        boostButtonY = h - boostButtonR - h * 0.05f
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -218,21 +218,17 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
         val dt = (now - lastFrameTime).coerceAtMost(33L)
         lastFrameTime = now
 
-        if (!isGameOver) {
-            update(dt)
-        }
+        if (!isGameOver) update(dt)
 
         drawWorld(canvas)
 
-        if (isGameOver) {
-            drawGameOver(canvas)
-        }
+        if (isGameOver) drawGameOver(canvas)
 
         invalidate()
     }
 
     private fun update(dt: Long) {
-        val speed = baseSpeed * (dt / 16.67f)
+        val speed = baseSpeed * (if (boosting) boostSpeedMul else 1f) * (dt / 16.67f)
 
         if (joyActive) {
             val targetAngle = atan2(joyVectorY, joyVectorX)
@@ -248,7 +244,6 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
         val newHeadX = head.x + cos(headAngle) * speed
         val newHeadY = head.y + sin(headAngle) * speed
 
-        // Стены
         if (newHeadX < segmentRadius || newHeadX > worldSize - segmentRadius ||
             newHeadY < segmentRadius || newHeadY > worldSize - segmentRadius
         ) {
@@ -262,7 +257,14 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
             trail.removeAt(0)
         }
 
-        // Столкновения с ботами
+        if (boosting) {
+            boostCooldown += dt
+            if (boostCooldown >= 500f) {
+                boostCooldown = 0f
+                if (snakeLength > 5) snakeLength -= 1
+            }
+        }
+
         for (bot in bots) {
             if (!bot.alive) continue
             val botSegments = bot.getSegments()
@@ -271,8 +273,7 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
                 val dx = newHeadX - seg.x
                 val dy = newHeadY - seg.y
                 if (dx * dx + dy * dy < (segmentRadius * 1.4f) * (segmentRadius * 1.4f)) {
-                    gameOver()
-                    return
+                    gameOver(); return
                 }
             }
             if (botSegments.isNotEmpty()) {
@@ -280,26 +281,24 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
                 val dx = newHeadX - botHead.x
                 val dy = newHeadY - botHead.y
                 if (dx * dx + dy * dy < (segmentRadius * 1.4f) * (segmentRadius * 1.4f)) {
-                    gameOver()
-                    return
+                    gameOver(); return
                 }
             }
         }
 
         checkFoodCollision(newHeadX, newHeadY)
 
-        // Боты
         val foodPositions = foods.map { PointF(it.x, it.y) }
         for (bot in bots) {
             if (!bot.alive) continue
-            val enemiesForThisBot = mutableListOf<PointF>()
-            enemiesForThisBot.addAll(getSnakeSegments())
-            for (otherBot in bots) {
-                if (otherBot !== bot && otherBot.alive) {
-                    enemiesForThisBot.addAll(otherBot.getSegments())
+            val enemies = mutableListOf<PointF>()
+            enemies.addAll(getSnakeSegments())
+            for (other in bots) {
+                if (other !== bot && other.alive) {
+                    enemies.addAll(other.getSegments())
                 }
             }
-            bot.update(dt, foodPositions, enemiesForThisBot)
+            bot.update(dt, foodPositions, enemies)
         }
 
         val eatenFoods = mutableListOf<Food>()
@@ -315,6 +314,19 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
         }
         foods.removeAll(eatenFoods)
 
+        val deadBots = bots.filter { !it.alive }
+        for (bot in deadBots) {
+            val head2 = bot.trail.lastOrNull() ?: continue
+            val dropCount = (bot.length / 3).coerceAtLeast(2)
+            for (i in 0 until dropCount) {
+                foods.add(Food(
+                    head2.x + (Math.random().toFloat() - 0.5f) * 100f,
+                    head2.y + (Math.random().toFloat() - 0.5f) * 100f,
+                    Color.rgb(255, 200, 60),
+                    true
+                ))
+            }
+        }
         bots.removeAll { !it.alive }
 
         camX = newHeadX - width / 2f
@@ -323,7 +335,6 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
 
     private fun gameOver() {
         isGameOver = true
-
         if (score > bestScore) {
             bestScore = score
             prefs.edit().putInt("best_score", bestScore).apply()
@@ -339,8 +350,9 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
             val dy = food.y - hy
             if (sqrt(dx * dx + dy * dy) < segmentRadius + foodRadius) {
                 iter.remove()
-                score += 1
-                if (score % 10 == 0) {
+                val points = if (food.big) 10 else 1
+                score += points
+                while (score >= snakeLength * 10) {
                     snakeLength += 1
                 }
                 newFoods.add(spawnFood())
@@ -352,7 +364,6 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
     private fun getSnakeSegments(): List<PointF> {
         val result = mutableListOf<PointF>()
         if (trail.isEmpty()) return result
-
         result.add(trail.last())
 
         var needDist = segmentSpacing.toDouble()
@@ -381,15 +392,17 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
         while (result.size < snakeLength) {
             result.add(PointF(trail[0].x, trail[0].y))
         }
-
         return result
     }
 
+    // ===== ПРОДОЛЖЕНИЕ — ЧАСТЬ 2B =====
+    // Сюда вставим: drawWorld, drawLeaderboard, drawGameOver, onTouchEvent, updateJoy
+}
     private fun drawWorld(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 30, 50))
 
         // Сетка
-        val gridSize = 100f
+        val gridSize = 200f
         val gridStartX = -(camX % gridSize)
         val gridStartY = -(camY % gridSize)
         var x = gridStartX
@@ -404,34 +417,31 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
         }
 
         // Границы
-        canvas.drawRect(
-            -camX, -camY,
-            worldSize - camX, worldSize - camY,
-            paintBorder
-        )
+        canvas.drawRect(-camX, -camY, worldSize - camX, worldSize - camY, paintBorder)
 
-        // Еда
+        // Еда (culling)
         for (food in foods) {
             val sx = food.x - camX
             val sy = food.y - camY
             if (sx > -20 && sx < width + 20 && sy > -20 && sy < height + 20) {
-                paintFood.color = food.color
-                canvas.drawCircle(sx, sy, foodRadius, paintFood)
+                if (food.big) {
+                    paintBigFood.color = food.color
+                    canvas.drawCircle(sx, sy, foodRadius * 2.2f, paintBigFood)
+                } else {
+                    paintFood.color = food.color
+                    canvas.drawCircle(sx, sy, foodRadius, paintFood)
+                }
             }
         }
 
         // Боты
         for (bot in bots) {
-            if (bot.alive) {
-                bot.draw(canvas, camX, camY, paintBotBody, paintBotHead)
-            }
+            bot.draw(canvas, camX, camY, paintSnakeBody, paintSnakeHead)
         }
 
         // Игрок
         if (!isGameOver) {
             val segments = getSnakeSegments()
-
-            // Базовые компоненты скина
             val baseR = (skinColor shr 16) and 0xFF
             val baseG = (skinColor shr 8) and 0xFF
             val baseB = skinColor and 0xFF
@@ -440,15 +450,14 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
                 val seg = segments[i]
                 val sx = seg.x - camX
                 val sy = seg.y - camY
+                if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) continue
 
-                // Затемняем от головы к хвосту
                 val t = 1f - (i.toFloat() / segments.size)
                 val factor = 0.55f + 0.45f * t
                 val r = (baseR * factor).toInt().coerceIn(0, 255)
                 val g = (baseG * factor).toInt().coerceIn(0, 255)
                 val b = (baseB * factor).toInt().coerceIn(0, 255)
                 paintSnakeBody.color = Color.rgb(r, g, b)
-
                 canvas.drawCircle(sx, sy, segmentRadius, paintSnakeBody)
             }
 
@@ -456,12 +465,10 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
             val hx = head.x - camX
             val hy = head.y - camY
 
-            // Голова — ярче скина
-            val headR = (baseR + (255 - baseR) * 0.3f).toInt().coerceIn(0, 255)
-            val headG = (baseG + (255 - baseG) * 0.3f).toInt().coerceIn(0, 255)
-            val headB = (baseB + (255 - baseB) * 0.3f).toInt().coerceIn(0, 255)
-            paintSnakeHead.color = Color.rgb(headR, headG, headB)
-
+            val hr = (baseR + (255 - baseR) * 0.3f).toInt().coerceIn(0, 255)
+            val hg = (baseG + (255 - baseG) * 0.3f).toInt().coerceIn(0, 255)
+            val hb = (baseB + (255 - baseB) * 0.3f).toInt().coerceIn(0, 255)
+            paintSnakeHead.color = Color.rgb(hr, hg, hb)
             canvas.drawCircle(hx, hy, segmentRadius * 1.15f, paintSnakeHead)
 
             val eyeDist = segmentRadius * 0.55f
@@ -477,26 +484,66 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
 
             canvas.drawCircle(eye1X, eye1Y, segmentRadius * 0.35f, paintEyeWhite)
             canvas.drawCircle(eye2X, eye2Y, segmentRadius * 0.35f, paintEyeWhite)
-            canvas.drawCircle(
-                eye1X + fwdX * segmentRadius * 0.15f,
-                eye1Y + fwdY * segmentRadius * 0.15f,
-                segmentRadius * 0.18f, paintEyeBlack
-            )
-            canvas.drawCircle(
-                eye2X + fwdX * segmentRadius * 0.15f,
-                eye2Y + fwdY * segmentRadius * 0.15f,
-                segmentRadius * 0.18f, paintEyeBlack
-            )
-        }
+            canvas.drawCircle(eye1X + fwdX * 3f, eye1Y + fwdY * 3f, segmentRadius * 0.18f, paintEyeBlack)
+            canvas.drawCircle(eye2X + fwdX * 3f, eye2Y + fwdY * 3f, segmentRadius * 0.18f, paintEyeBlack)
 
-        // UI
-        if (!isGameOver) {
+            canvas.drawText(playerNick, hx, hy - segmentRadius * 2f, paintNick)
+
+            // Джойстик
             canvas.drawCircle(joyCenterX, joyCenterY, joyRadius, paintJoyBase)
             canvas.drawCircle(joyKnobX, joyKnobY, joyRadius * 0.45f, paintJoyKnob)
 
-            canvas.drawText("Score: $score", 40f, 70f, paintScore)
-            canvas.drawText("Length: $snakeLength", 40f, 130f, paintScore)
-            canvas.drawText("Best: $bestScore", 40f, 190f, paintScore)
+            // Кнопка ускорения
+            canvas.drawCircle(boostButtonX, boostButtonY, boostButtonR, paintBoostBase)
+            val arrowPaint = Paint().apply {
+                color = Color.argb(200, 255, 255, 255)
+                strokeWidth = 5f
+                style = Paint.Style.STROKE
+                isAntiAlias = true
+            }
+            val ax = boostButtonX
+            val ay = boostButtonY
+            canvas.drawLine(ax, ay + 15f, ax, ay - 15f, arrowPaint)
+            canvas.drawLine(ax - 12f, ay - 3f, ax, ay - 15f, arrowPaint)
+            canvas.drawLine(ax + 12f, ay - 3f, ax, ay - 15f, arrowPaint)
+        }
+
+        if (!isGameOver) {
+            canvas.drawText("Score: $score", 40f, 60f, paintScore)
+            canvas.drawText("Length: $snakeLength", 40f, 110f, paintScore)
+            drawLeaderboard(canvas)
+        }
+    }
+
+    private fun drawLeaderboard(canvas: Canvas) {
+        val entries = mutableListOf<Pair<String, Int>>()
+        entries.add(playerNick to score)
+        for (bot in bots) {
+            if (bot.alive) entries.add(bot.nick to bot.score)
+        }
+        entries.sortByDescending { it.second }
+        val top = entries.take(10)
+
+        val lbX = width - 300f
+        val lbY = 30f
+        val lbW = 280f
+        val rowH = 34f
+        val lbH = rowH * (top.size + 1) + 20f
+
+        canvas.drawRect(lbX, lbY, lbX + lbW, lbY + lbH, paintLeaderBg)
+
+        canvas.drawText("🏆 ЛИДЕРЫ", lbX + 15f, lbY + 30f, paintLeader)
+
+        for ((i, entry) in top.withIndex()) {
+            val y = lbY + 30f + rowH * (i + 1)
+            if (entry.first == playerNick) {
+                canvas.drawRect(lbX + 5f, y - 25f, lbX + lbW - 5f, y + 5f, paintLeaderHighlight)
+            }
+            canvas.drawText("${i + 1}.", lbX + 15f, y, paintLeader)
+            canvas.drawText(entry.first, lbX + 55f, y, paintLeader)
+            val numText = entry.second.toString()
+            val numWidth = paintLeader.measureText(numText)
+            canvas.drawText(numText, lbX + lbW - 15f - numWidth, y, paintLeader)
         }
     }
 
@@ -527,6 +574,13 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
                     lastFrameTime = SystemClock.uptimeMillis()
                     return true
                 }
+                // Кнопка ускорения?
+                val dxB = x - boostButtonX
+                val dyB = y - boostButtonY
+                if (dxB * dxB + dyB * dyB < boostButtonR * boostButtonR) {
+                    boosting = true
+                    return true
+                }
                 if (x < width / 2f) {
                     joyActive = true
                     updateJoy(x, y)
@@ -537,6 +591,7 @@ class GameView(context: Context, val mode: String = "OFFLINE") : View(context) {
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 joyActive = false
+                boosting = false
                 joyKnobX = joyCenterX
                 joyKnobY = joyCenterY
                 joyVectorX = 0f

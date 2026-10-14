@@ -18,10 +18,11 @@ class MainActivity : AppCompatActivity() {
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
 
-        // Режим: OFFLINE / HOST / CLIENT
-        val mode = intent.getStringExtra("mode") ?: "OFFLINE"
+        // Режим и сеть из глобального держателя
+        val mode = NetworkHolder.mode
+        val net = NetworkHolder.manager
 
-        gameView = GameView(this, mode)
+        gameView = GameView(this, mode, net)
         setContentView(gameView)
 
         hideSystemUI()
@@ -46,6 +47,11 @@ class MainActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        // Отключаем сеть при выходе
+        NetworkHolder.manager?.stop()
+        NetworkHolder.manager = null
+        NetworkHolder.mode = "OFFLINE"
+
         startActivity(Intent(this, MenuActivity::class.java))
         finish()
     }

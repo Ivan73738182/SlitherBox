@@ -19,7 +19,7 @@ class LanMenuActivity : AppCompatActivity() {
     private lateinit var btnConnect: Button
     private lateinit var btnStartGame: Button
 
-    private val net = NetworkManager()
+    private lateinit var net: NetworkManager
     private var isHost = false
     private var isConnected = false
 
@@ -34,18 +34,22 @@ class LanMenuActivity : AppCompatActivity() {
         setContentView(R.layout.activity_lan_menu)
         hideSystemUI()
 
+        // Используем общий NetworkManager из NetworkHolder
+        if (NetworkHolder.manager == null) {
+            NetworkHolder.manager = NetworkManager()
+        }
+        net = NetworkHolder.manager!!
+
         tvHostId = findViewById(R.id.tvHostId)
         tvHostStatus = findViewById(R.id.tvHostStatus)
         etHostIp = findViewById(R.id.etHostIp)
         btnCreateGame = findViewById(R.id.btnCreateGame)
         btnConnect = findViewById(R.id.btnConnect)
+        btnStartGame = findViewById(R.id.btnStartGame)
+        btnStartGame.isEnabled = false
+        btnStartGame.visibility = View.GONE
 
-// Кнопка "Начать игру" — уже в layout
-btnStartGame = findViewById(R.id.btnStartGame)
-btnStartGame.isEnabled = false
-btnStartGame.visibility = View.GONE
-
-        // Настраиваем сетевые колбэки
+        // Колбэки
         net.onConnected = {
             isConnected = true
             runOnUiThread {
@@ -62,7 +66,6 @@ btnStartGame.visibility = View.GONE
                 tvHostStatus.text = "❌ Отключено"
                 btnStartGame.isEnabled = false
                 btnStartGame.visibility = View.GONE
-                Toast.makeText(this, "❌ Соединение потеряно", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -74,7 +77,6 @@ btnStartGame.visibility = View.GONE
         }
 
         net.onMessageReceived = { msg ->
-            // Обработка сообщений от сервера
             if (msg.startsWith("HOST_READY")) {
                 val parts = msg.split("|")
                 val ip = parts.getOrNull(1) ?: "?"
@@ -90,13 +92,11 @@ btnStartGame.visibility = View.GONE
             }
         }
 
-        // Создать игру (хост)
+        // Создать игру
         btnCreateGame.setOnClickListener {
-            if (isConnected) {
-                Toast.makeText(this, "Уже подключено!", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+            if (isConnected) return@setOnClickListener
             isHost = true
+            NetworkHolder.mode = "HOST"
             btnCreateGame.isEnabled = false
             btnConnect.isEnabled = false
             tvHostId.text = "ID: получаю IP..."
@@ -104,20 +104,19 @@ btnStartGame.visibility = View.GONE
             net.startHost()
         }
 
-        // Подключиться (клиент)
+        // Подключиться
         btnConnect.setOnClickListener {
             val ipPort = etHostIp.text.toString().trim()
             if (ipPort.isEmpty()) {
-                Toast.makeText(this, "Введи ID хоста (IP:порт)", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Введи ID хоста", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-
-            // Парсим "192.168.1.42:8888"
             val parts = ipPort.split(":")
             val ip = parts[0]
             val port = parts.getOrNull(1)?.toIntOrNull() ?: 8888
 
             isHost = false
+            NetworkHolder.mode = "CLIENT"
             btnCreateGame.isEnabled = false
             btnConnect.isEnabled = false
             tvHostStatus.text = "Подключение к $ip:$port..."
@@ -127,20 +126,22 @@ btnStartGame.visibility = View.GONE
         // Начать игру
         btnStartGame.setOnClickListener {
             val intent = Intent(this, MainActivity::class.java)
-            intent.putExtra("mode", if (isHost) "HOST" else "CLIENT")
             startActivity(intent)
         }
 
         // Назад
         findViewById<Button>(R.id.btnBack).setOnClickListener {
             net.stop()
+            NetworkHolder.manager = null
+            NetworkHolder.mode = "OFFLINE"
             finish()
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        net.stop()
+        // НЕ закрываем сеть — она нужна в MainActivity
+        // net.stop() — только по кнопке "Назад"
     }
 
     private fun hideSystemUI() {
