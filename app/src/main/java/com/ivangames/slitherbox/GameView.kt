@@ -225,7 +225,7 @@ class GameView(
         joyKnobX = joyCenterX
         joyKnobY = joyCenterY
 
-        boostButtonR = h * 0.12f
+        boostButtonR = h * 0.16f
         boostButtonX = w - boostButtonR - h * 0.05f
         boostButtonY = h - boostButtonR - h * 0.05f
     }
@@ -735,12 +735,13 @@ class GameView(
                     lastFrameTime = SystemClock.uptimeMillis()
                     return true
                 }
-                val dxB = x - boostButtonX
-                val dyB = y - boostButtonY
-                if (dxB * dxB + dyB * dyB < boostButtonR * boostButtonR) {
-                    boosting = true
-                    return true
-                }
+val dxB = x - boostButtonX
+val dyB = y - boostButtonY
+val touchRadius = boostButtonR * 1.6f  // зона нажатия шире визуальной
+if (dxB * dxB + dyB * dyB < touchRadius * touchRadius) {
+    boosting = true
+    return true
+}
                 if (x < width / 2f) {
                     joyActive = true
                     updateJoy(x, y)
