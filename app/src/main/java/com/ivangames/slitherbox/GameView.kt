@@ -131,6 +131,25 @@ class GameView(
     }
     private val paintOverlayBg = Paint().apply { color = Color.argb(180, 0, 0, 0) }
 
+    // ===== LAN =====
+    private var remotePlayerX = 0f
+    private var remotePlayerY = 0f
+    private var remotePlayerAngle = 0f
+    private var remotePlayerLen = 5
+    private var remotePlayerScore = 0
+    private var remotePlayerNick = "FRIEND"
+    private var remotePlayerColor = 0xFF64B5F6.toInt()
+    private var hasRemotePlayer = false
+
+    private var lastSendTime = 0L
+    private val sendIntervalMs = 50L
+
+    private data class RemoteBot(
+        val nick: String, val x: Float, val y: Float,
+        val angle: Float, val length: Int, val color: Int
+    )
+    private val remoteBots = mutableListOf<RemoteBot>()
+
     private var lastFrameTime = 0L
 
     init {
@@ -141,12 +160,22 @@ class GameView(
 
         startNewGame()
         lastFrameTime = SystemClock.uptimeMillis()
+
+        // LAN колбэки
+        net?.onMessageReceived = { msg ->
+            post { handleNetworkMessage(msg) }
+        }
+        net?.onDisconnected = {
+            post { hasRemotePlayer = false }
+        }
     }
 
     private fun startNewGame() {
         trail.clear()
         foods.clear()
         bots.clear()
+        remoteBots.clear()
+        hasRemotePlayer = false
 
         val startX = worldSize / 2f
         val startY = worldSize / 2f
@@ -167,15 +196,18 @@ class GameView(
 
         repeat(600) { foods.add(spawnFood()) }
 
-        val margin = 500f
-        for (i in 0 until 30) {
-            val bx = margin + Math.random().toFloat() * (worldSize - 2 * margin)
-            val by = margin + Math.random().toFloat() * (worldSize - 2 * margin)
-            val ba = (Math.random() * 2 * Math.PI).toFloat()
-            val color = botColors[i % botColors.size]
-            val headColor = lighten(color, 0.3f)
-            val nick = botNames[i % botNames.size]
-            bots.add(BotSnake(bx, by, ba, color, headColor, worldSize, nick))
+        // Только ХОСТ или OFFLINE спавнит ботов
+        if (mode == "HOST" || mode == "OFFLINE") {
+            val margin = 500f
+            for (i in 0 until 30) {
+                val bx = margin + Math.random().toFloat() * (worldSize - 2 * margin)
+                val by = margin + Math.random().toFloat() * (worldSize - 2 * margin)
+                val ba = (Math.random() * 2 * Math.PI).toFloat()
+                val color = botColors[i % botColors.size]
+                val headColor = lighten(color, 0.3f)
+                val nick = botNames[i % botNames.size]
+                bots.add(BotSnake(bx, by, ba, color, headColor, worldSize, nick))
+            }
         }
     }
 
@@ -265,72 +297,86 @@ class GameView(
             }
         }
 
-        for (bot in bots) {
-            if (!bot.alive) continue
-            val botSegments = bot.getSegments()
-            for (i in 1 until botSegments.size) {
-                val seg = botSegments[i]
-                val dx = newHeadX - seg.x
-                val dy = newHeadY - seg.y
-                if (dx * dx + dy * dy < (segmentRadius * 1.4f) * (segmentRadius * 1.4f)) {
-                    gameOver(); return
+        // Столкновения — только для HOST / OFFLINE
+        if (mode != "CLIENT") {
+            for (bot in bots) {
+                if (!bot.alive) continue
+                val botSegments = bot.getSegments()
+                for (i in 1 until botSegments.size) {
+                    val seg = botSegments[i]
+                    val dx = newHeadX - seg.x
+                    val dy = newHeadY - seg.y
+                    if (dx * dx + dy * dy < (segmentRadius * 1.4f) * (segmentRadius * 1.4f)) {
+                        gameOver(); return
+                    }
                 }
-            }
-            if (botSegments.isNotEmpty()) {
-                val botHead = botSegments[0]
-                val dx = newHeadX - botHead.x
-                val dy = newHeadY - botHead.y
-                if (dx * dx + dy * dy < (segmentRadius * 1.4f) * (segmentRadius * 1.4f)) {
-                    gameOver(); return
+                if (botSegments.isNotEmpty()) {
+                    val botHead = botSegments[0]
+                    val dx = newHeadX - botHead.x
+                    val dy = newHeadY - botHead.y
+                    if (dx * dx + dy * dy < (segmentRadius * 1.4f) * (segmentRadius * 1.4f)) {
+                        gameOver(); return
+                    }
                 }
             }
         }
 
         checkFoodCollision(newHeadX, newHeadY)
 
-        val foodPositions = foods.map { PointF(it.x, it.y) }
-        for (bot in bots) {
-            if (!bot.alive) continue
-            val enemies = mutableListOf<PointF>()
-            enemies.addAll(getSnakeSegments())
-            for (other in bots) {
-                if (other !== bot && other.alive) {
-                    enemies.addAll(other.getSegments())
+        // Боты — только HOST / OFFLINE
+        if (mode != "CLIENT") {
+            val foodPositions = foods.map { PointF(it.x, it.y) }
+            for (bot in bots) {
+                if (!bot.alive) continue
+                val enemies = mutableListOf<PointF>()
+                enemies.addAll(getSnakeSegments())
+                for (other in bots) {
+                    if (other !== bot && other.alive) {
+                        enemies.addAll(other.getSegments())
+                    }
+                }
+                bot.update(dt, foodPositions, enemies)
+            }
+
+            val eatenFoods = mutableListOf<Food>()
+            for (bot in bots) {
+                if (!bot.alive) continue
+                for (food in foods) {
+                    if (bot.tryEat(food.x, food.y)) {
+                        eatenFoods.add(food)
+                        foods.add(spawnFood())
+                        break
+                    }
                 }
             }
-            bot.update(dt, foodPositions, enemies)
-        }
+            foods.removeAll(eatenFoods)
 
-        val eatenFoods = mutableListOf<Food>()
-        for (bot in bots) {
-            if (!bot.alive) continue
-            for (food in foods) {
-                if (bot.tryEat(food.x, food.y)) {
-                    eatenFoods.add(food)
-                    foods.add(spawnFood())
-                    break
+            val deadBots = bots.filter { !it.alive }
+            for (bot in deadBots) {
+                val head2 = bot.trail.lastOrNull() ?: continue
+                val dropCount = (bot.length / 3).coerceAtLeast(2)
+                for (i in 0 until dropCount) {
+                    foods.add(Food(
+                        head2.x + (Math.random().toFloat() - 0.5f) * 100f,
+                        head2.y + (Math.random().toFloat() - 0.5f) * 100f,
+                        Color.rgb(255, 200, 60),
+                        true
+                    ))
                 }
             }
+            bots.removeAll { !it.alive }
         }
-        foods.removeAll(eatenFoods)
-
-        val deadBots = bots.filter { !it.alive }
-        for (bot in deadBots) {
-            val head2 = bot.trail.lastOrNull() ?: continue
-            val dropCount = (bot.length / 3).coerceAtLeast(2)
-            for (i in 0 until dropCount) {
-                foods.add(Food(
-                    head2.x + (Math.random().toFloat() - 0.5f) * 100f,
-                    head2.y + (Math.random().toFloat() - 0.5f) * 100f,
-                    Color.rgb(255, 200, 60),
-                    true
-                ))
-            }
-        }
-        bots.removeAll { !it.alive }
 
         camX = newHeadX - width / 2f
         camY = newHeadY - height / 2f
+
+        // ===== LAN =====
+        val now = SystemClock.uptimeMillis()
+        if (now - lastSendTime >= sendIntervalMs) {
+            lastSendTime = now
+            if (mode == "HOST") sendHostState()
+            else if (mode == "CLIENT") sendClientState()
+        }
     }
 
     private fun gameOver() {
@@ -342,6 +388,9 @@ class GameView(
     }
 
     private fun checkFoodCollision(hx: Float, hy: Float) {
+        // Клиент не ест — это делает хост
+        if (mode == "CLIENT") return
+
         val newFoods = mutableListOf<Food>()
         val iter = foods.iterator()
         while (iter.hasNext()) {
@@ -395,8 +444,7 @@ class GameView(
         return result
     }
 
-    // ===== ПРОДОЛЖЕНИЕ — ЧАСТЬ 2B =====
-    // Сюда вставим: drawWorld, drawLeaderboard, drawGameOver, onTouchEvent, updateJoy
+    // ===== ПРОДОЛЖЕНИЕ — ШАГ 3 =====
 }
     private fun drawWorld(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 30, 50))
@@ -434,10 +482,20 @@ class GameView(
             }
         }
 
-        // Боты
-        for (bot in bots) {
-            bot.draw(canvas, camX, camY, paintSnakeBody, paintSnakeHead)
+        // Боты — HOST/OFFLINE
+        if (mode != "CLIENT") {
+            for (bot in bots) {
+                bot.draw(canvas, camX, camY, paintSnakeBody, paintSnakeHead)
+            }
         }
+
+        // Боты — CLIENT (удалённые)
+        if (mode == "CLIENT") {
+            drawRemoteBots(canvas)
+        }
+
+        // Удалённый игрок
+        drawRemotePlayer(canvas)
 
         // Игрок
         if (!isGameOver) {
@@ -518,9 +576,24 @@ class GameView(
     private fun drawLeaderboard(canvas: Canvas) {
         val entries = mutableListOf<Pair<String, Int>>()
         entries.add(playerNick to score)
-        for (bot in bots) {
-            if (bot.alive) entries.add(bot.nick to bot.score)
+
+        if (mode == "CLIENT") {
+            // У клиента — только свой счёт + удалённые боты (у них нет счёта — просто длина)
+            for (bot in remoteBots) {
+                entries.add(bot.nick to bot.length)
+            }
+        } else {
+            // У хоста — свои боты
+            for (bot in bots) {
+                if (bot.alive) entries.add(bot.nick to bot.score)
+            }
         }
+
+        // Удалённый игрок
+        if (hasRemotePlayer) {
+            entries.add(remotePlayerNick to remotePlayerScore)
+        }
+
         entries.sortByDescending { it.second }
         val top = entries.take(10)
 
@@ -531,7 +604,6 @@ class GameView(
         val lbH = rowH * (top.size + 1) + 20f
 
         canvas.drawRect(lbX, lbY, lbX + lbW, lbY + lbH, paintLeaderBg)
-
         canvas.drawText("🏆 ЛИДЕРЫ", lbX + 15f, lbY + 30f, paintLeader)
 
         for ((i, entry) in top.withIndex()) {
@@ -549,20 +621,166 @@ class GameView(
 
     private fun drawGameOver(canvas: Canvas) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paintOverlayBg)
-
         val cx = width / 2f
         val cy = height / 2f
-
         canvas.drawText("Game Over", cx, cy - 100f, paintGameOverTitle)
         canvas.drawText("Score: $score", cx, cy + 20f, paintGameOverText)
         canvas.drawText("Best: $bestScore", cx, cy + 90f, paintGameOverText)
-
         val blink = (SystemClock.uptimeMillis() / 500) % 2 == 0L
         if (blink) {
             canvas.drawText("Tap to restart", cx, cy + 200f, paintGameOverHint)
         }
     }
 
+    // ===== LAN: обработка сообщений =====
+    private fun handleNetworkMessage(msg: String) {
+        if (msg.startsWith("CLIENT|")) {
+            val p = msg.split("|")
+            if (p.size >= 6) {
+                remotePlayerX = p[1].toFloatOrNull() ?: 0f
+                remotePlayerY = p[2].toFloatOrNull() ?: 0f
+                remotePlayerAngle = p[3].toFloatOrNull() ?: 0f
+                remotePlayerLen = p[4].toIntOrNull() ?: 5
+                remotePlayerScore = p[5].toIntOrNull() ?: 0
+                hasRemotePlayer = true
+            }
+        } else if (msg.startsWith("STATE|")) {
+            parseStateMessage(msg)
+        }
+    }
+
+    private fun parseStateMessage(msg: String) {
+        val p = msg.split("|")
+        if (p.size < 9) return
+
+        remotePlayerX = p[1].toFloatOrNull() ?: 0f
+        remotePlayerY = p[2].toFloatOrNull() ?: 0f
+        remotePlayerAngle = p[3].toFloatOrNull() ?: 0f
+        remotePlayerLen = p[4].toIntOrNull() ?: 5
+        remotePlayerScore = p[5].toIntOrNull() ?: 0
+
+        val foodCount = p[6].toIntOrNull() ?: 0
+        val botCount = p[7].toIntOrNull() ?: 0
+
+        var idx = 8
+
+        // Еда
+        foods.clear()
+        for (i in 0 until foodCount) {
+            if (idx >= p.size) break
+            val parts = p[idx].split(",")
+            if (parts.size >= 3) {
+                val fx = parts[0].toFloatOrNull() ?: 0f
+                val fy = parts[1].toFloatOrNull() ?: 0f
+                val fc = parts[2].toIntOrNull() ?: Color.GREEN
+                foods.add(Food(fx, fy, fc, false))
+            }
+            idx++
+        }
+
+        // Боты
+        remoteBots.clear()
+        for (i in 0 until botCount) {
+            if (idx >= p.size) break
+            val parts = p[idx].split(",")
+            if (parts.size >= 6) {
+                val nick = parts[0]
+                val bx = parts[1].toFloatOrNull() ?: 0f
+                val by = parts[2].toFloatOrNull() ?: 0f
+                val ba = parts[3].toFloatOrNull() ?: 0f
+                val bl = parts[4].toIntOrNull() ?: 5
+                val bc = parts[5].toIntOrNull() ?: Color.RED
+                remoteBots.add(RemoteBot(nick, bx, by, ba, bl, bc))
+            }
+            idx++
+        }
+
+        hasRemotePlayer = true
+    }
+
+    private fun sendHostState() {
+        val n = net ?: return
+        if (mode != "HOST") return
+
+        val head = trail.lastOrNull() ?: return
+        val sb = StringBuilder()
+        sb.append("STATE|")
+        sb.append(head.x).append("|")
+        sb.append(head.y).append("|")
+        sb.append(headAngle).append("|")
+        sb.append(snakeLength).append("|")
+        sb.append(score).append("|")
+
+        // Еда — шлём все (для клиента — он не ест, значит не растёт)
+        sb.append(foods.size).append("|")
+        sb.append(bots.size).append("|")
+
+        for (food in foods) {
+            sb.append(food.x).append(",").append(food.y).append(",").append(food.color).append("|")
+        }
+
+        for (bot in bots) {
+            if (!bot.alive) continue
+            val h = bot.trail.lastOrNull() ?: continue
+            val col = botColors[bots.indexOf(bot) % botColors.size]
+            sb.append(bot.nick).append(",")
+                .append(h.x).append(",")
+                .append(h.y).append(",")
+                .append(bot.headAngle).append(",")
+                .append(bot.length).append(",")
+                .append(col).append("|")
+        }
+
+        n.send(sb.toString())
+    }
+
+    private fun sendClientState() {
+        val n = net ?: return
+        if (mode != "CLIENT") return
+
+        val head = trail.lastOrNull() ?: return
+        val sb = StringBuilder()
+        sb.append("CLIENT|")
+        sb.append(head.x).append("|")
+        sb.append(head.y).append("|")
+        sb.append(headAngle).append("|")
+        sb.append(snakeLength).append("|")
+        sb.append(score)
+
+        n.send(sb.toString())
+    }
+
+    // ===== LAN: отрисовка =====
+    private fun drawRemotePlayer(canvas: Canvas) {
+        if (!hasRemotePlayer) return
+        val sx = remotePlayerX - camX
+        val sy = remotePlayerY - camY
+        if (sx < -100 || sx > width + 100 || sy < -100 || sy > height + 100) return
+
+        val paint = Paint().apply {
+            color = remotePlayerColor
+            isAntiAlias = true
+        }
+        canvas.drawCircle(sx, sy, segmentRadius * 1.2f, paint)
+        canvas.drawText(remotePlayerNick, sx, sy - segmentRadius * 2.5f, paintNick)
+    }
+
+    private fun drawRemoteBots(canvas: Canvas) {
+        for (bot in remoteBots) {
+            val sx = bot.x - camX
+            val sy = bot.y - camY
+            if (sx < -50 || sx > width + 50 || sy < -50 || sy > height + 50) continue
+
+            val paint = Paint().apply {
+                color = bot.color
+                isAntiAlias = true
+            }
+            canvas.drawCircle(sx, sy, segmentRadius, paint)
+            canvas.drawText(bot.nick, sx, sy - segmentRadius * 2f, paintNick)
+        }
+    }
+
+    // ===== ТАЧ =====
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val x = event.x
         val y = event.y
@@ -574,7 +792,6 @@ class GameView(
                     lastFrameTime = SystemClock.uptimeMillis()
                     return true
                 }
-                // Кнопка ускорения?
                 val dxB = x - boostButtonX
                 val dyB = y - boostButtonY
                 if (dxB * dxB + dyB * dyB < boostButtonR * boostButtonR) {
